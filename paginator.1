@@ -1,0 +1,86 @@
+.TH PAGINATOR 1
+.SH NAME
+paginator \- X11 desktop pager
+.SH SYNOPSIS
+.B paginator
+.RB [ \-w ]
+.RB [ \-c
+.IR corner ]
+.RB [ \-g
+.IR geometry ]
+.RB [ \-l
+.IR layout ]
+.RB [ \-o
+.IR orientation ]
+.SH DESCRIPTION
+.B paginator
+is a desktop pager for X11 that provides to the user a GUI interface
+to change the current desktop or the current window with mouse's button 1.
+.PP
+The options are as follows:
+.TP
+\fB\-c\fP \fIcorner\fP
+Specify the corner of the pager in which the first desktop should be placed.
+The argument for this option must be
+.BR TL ,
+.BR TR ,
+.BR BL ,
+or
+.B BR
+(top-left, top-right, bottom-left, or bottom-right, respectively).
+If not provided, the starting corner will be top-left.
+.TP
+\fB\-g\fP \fIgeometry\fP
+Specify a size for the pager window.
+The argument for this option must be a geometry specification recognized by
+.IR XParseGeometry (1)
+If not provided, the window size will be computed from
+the pager layout, the number of desktops and the size of the screen.
+.TP
+\fB\-l\fP \fIlayout\fP
+Specify the layout of the pager.
+The argument for this option must be in the format \fINCOLS\fPx\fINROWS\fP,
+where
+.I NCOLS
+is the number of columns in the pager, and
+.I NROWS
+is the number of rows in the pager.
+If not specified, the number of columns will be 2,
+and the number of rows will be computed from the number of desktops.
+.TP
+\fB\-o\fP \fIorientation\fP
+Specify the orientation of the desktops on the pager.
+The argument for this option must be
+.BR H ,
+or
+.B V
+(horizontal or vertical, respectively).
+If not provided, the starting corner will be horizontal.
+.TP
+.B \-w
+Start in the withdrawn mode.
+This makes
+.B paginator
+work like a dockapp.
+.PP
+.B Paginator
+only works in cooperation with EWMH-compliant window managers.
+In particular, with window managers which set the
+_NET_CLIENT_LIST_STACKING and _NET_NUMBER_OF_DESKTOPS
+properties.
+.SH ENVIRONMENT
+The following environment variables affect the execution of
+.B paginator
+.TP
+.B DISPLAY
+The display to start
+.B paginator
+on.
+.SH SEE ALSO
+.IR X (1)
+.SH BUGS
+.B Paginator
+does not move client windows by moving the mini windows in the pager.
+It does not show the icon name nor the icon of the client windows in the pager.
+It also does not have an option to present itself to the window manager as a panel/bar.
+Those features may be added in a later version.
