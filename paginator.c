@@ -374,16 +374,26 @@ cleandesktops(void)
 	free(pager.desktops);
 }
 
-/* free clients, destroy their mini-windows and free the client array */
+/* destroy client's mini-windows and free it */
+static void
+cleanclient(struct Client *cp)
+{
+	if (cp == NULL)
+		return;
+	if (cp->miniwin != None)
+		XDestroyWindow(dpy, cp->miniwin);
+	free(cp);
+}
+
+/* free clients and client array */
 static void
 cleanclients(void)
 {
 	size_t i;
 
 	for (i = 0; i < pager.nclients; i++) {
-		if (pager.clients[i] != NULL && pager.clients[i]->miniwin != None)
-			XDestroyWindow(dpy, pager.clients[i]->miniwin);
-		free(pager.clients[i]);
+		cleanclient(pager.clients[i]);
+		pager.clients[i] = NULL;
 	}
 	free(pager.clients);
 }
@@ -473,12 +483,14 @@ setclients(void)
 				CWEventMask, &miniswa
 			);
 		}
-		if (!XGetGeometry(dpy, wins[i], &dw, &x, &y, &clients[i]->cw, &clients[i]->ch, &b, &du))
-			errx(1, "could not get window geometry");
-		if (!XTranslateCoordinates(dpy, wins[i], root, x, y, &clients[i]->cx, &clients[i]->cy, &dw))
-			errx(1, "could not translate window geometry");
-		clients[i]->ishidden = ishidden(clients[i]->clientwin);
-		clients[i]->desk = getcardprop(clients[i]->clientwin, atoms[_NET_WM_DESKTOP]);
+		if (XGetGeometry(dpy, wins[i], &dw, &x, &y, &clients[i]->cw, &clients[i]->ch, &b, &du) &&
+		    XTranslateCoordinates(dpy, wins[i], root, x, y, &clients[i]->cx, &clients[i]->cy, &dw)) {
+			clients[i]->ishidden = ishidden(clients[i]->clientwin);
+			clients[i]->desk = getcardprop(clients[i]->clientwin, atoms[_NET_WM_DESKTOP]);
+		} else {
+			cleanclient(clients[i]);
+			clients[i] = NULL;
+		}
 	}
 	cleanclients();
 	pager.clients = clients;
@@ -580,6 +592,8 @@ mapclient(struct Client *cp)
 	struct Desktop *dp;
 	int style;
 
+	if (cp == NULL)
+		return;
 	style = (cp->clientwin == pager.active) ? STYLE_ACTIVE : STYLE_INACTIVE;
 	XSetWindowBackground(dpy, cp->miniwin, dc.windowcolors[style][COLOR_BACKGROUND]);
 	XSetWindowBorder(dpy, cp->miniwin, dc.windowcolors[style][COLOR_BORDER]);
@@ -606,6 +620,8 @@ mapclients(void)
 
 	for (i = 0; i < pager.nclients; i++) {
 		cp = pager.clients[i];
+		if (cp == NULL)
+			continue;
 		if (pager.showingdesk) {
 			XUnmapWindow(dpy, cp->miniwin);
 			continue;
@@ -804,7 +820,7 @@ changedesk(Window win)
 		}
 	}
 	for (i = 0; i < pager.nclients; i++) {
-		if (win == pager.clients[i]->miniwin) {
+		if (pager.clients[i] != NULL && win == pager.clients[i]->miniwin) {
 			clientmsg(pager.clients[i]->clientwin, atoms[_NET_ACTIVE_WINDOW], 2, CurrentTime, 0, 0, 0);
 			return;
 		}
@@ -854,7 +870,7 @@ xeventconfigurenotify(XEvent *e)
 		mapclients();
 	} else {
 		for (i = 0; i < pager.nclients; i++) {
-			if (ev->window == pager.clients[i]->clientwin) {
+			if (pager.clients[i] != NULL && ev->window == pager.clients[i]->clientwin) {
 				mapclient(pager.clients[i]);
 				break;
 			}
