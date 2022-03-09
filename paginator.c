@@ -92,6 +92,7 @@ struct Client {
 	int cx, cy, cw, ch;
 	int x, y, w, h;
 	int ishidden;
+	int ismapped;
 };
 
 /* the pager */
@@ -148,7 +149,7 @@ static int iflag = 0;                   /* whether to draw icons */
 static void
 usage(void)
 {
-	(void)fprintf(stderr, "usage: paginator [-w] [-c corner] [-g geometry] [-l layout] [-o orientation]\n");
+	(void)fprintf(stderr, "usage: paginator [-iw] [-c corner] [-g geometry] [-l layout] [-o orientation]\n");
 	exit(1);
 }
 
@@ -617,6 +618,11 @@ setclients(void)
 	for (i = 0; i < nclients; i++) {
 		if ((clients[i] = getdelclient(wins[i])) == NULL) {
 			clients[i] = emalloc(sizeof(*clients[i]));
+			*clients[i] = (struct Client) {
+				.pix = None,
+				.ishidden = 0,
+				.ismapped = 0,
+			};
 			clients[i]->clientwin = wins[i];
 			XSelectInput(dpy, clients[i]->clientwin, StructureNotifyMask);
 			clients[i]->miniwin = XCreateWindow(
@@ -625,7 +631,6 @@ setclients(void)
 				CWEventMask, &miniswa
 			);
 			clients[i]->icon = iflag ? geticonprop(clients[i]->clientwin) : None;
-			clients[i]->pix = None;
 		}
 		if (XGetGeometry(dpy, wins[i], &dw, &x, &y, &clients[i]->cw, &clients[i]->ch, &b, &du) &&
 		    XTranslateCoordinates(dpy, wins[i], root, x, y, &clients[i]->cx, &clients[i]->cy, &dw)) {
@@ -729,6 +734,16 @@ mapdesktops(void)
 	}
 }
 
+/* unmap client miniwindow */
+static void
+unmapclient(struct Client *cp)
+{
+	if (cp->ismapped) {
+		XUnmapWindow(dpy, cp->miniwin);
+		cp->ismapped = 0;
+	}
+}
+
 /* remap single client miniwindow */
 static void
 mapclient(struct Client *cp)
@@ -740,7 +755,7 @@ mapclient(struct Client *cp)
 	if (cp == NULL)
 		return;
 	if (cp->ishidden || cp->desk < 0 || cp->desk >= pager.ndesktops) {
-		XUnmapWindow(dpy, cp->miniwin);
+		unmapclient(cp);
 		return;
 	}
 	dp = pager.desktops[cp->desk];
@@ -762,7 +777,10 @@ mapclient(struct Client *cp)
 	XSetWindowBackgroundPixmap(dpy, cp->miniwin, cp->pix);
 	XReparentWindow(dpy, cp->miniwin, dp->miniwin, cp->x, cp->y);
 	XMoveResizeWindow(dpy, cp->miniwin, cp->x, cp->y, cp->w, cp->h);
-	XMapWindow(dpy, cp->miniwin);
+	if (!cp->ismapped) {
+		XMapWindow(dpy, cp->miniwin);
+		cp->ismapped = 1;
+	}
 }
 
 /* remap all client miniwindows */
@@ -777,10 +795,10 @@ mapclients(void)
 		if (cp == NULL)
 			continue;
 		if (pager.showingdesk) {
-			XUnmapWindow(dpy, cp->miniwin);
-			continue;
+			unmapclient(cp);
+		} else {
+			mapclient(cp);
 		}
-		mapclient(cp);
 	}
 }
 
