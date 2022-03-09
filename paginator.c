@@ -9,9 +9,10 @@
 #include <X11/Xatom.h>
 #include <X11/Xproto.h>
 #include <X11/Xutil.h>
+#include <X11/extensions/Xrender.h>
 
 #define PROGNAME        "Paginator"
-#define PREF_ICON_SIZE  16              /* preferred icon size */
+#define ICON_SIZE       16              /* preferred icon size */
 #define MAX_DESKTOPS    100             /* maximum number of desktops */
 #define DEF_WIDTH       125             /* default width for the pager */
 #define DEF_NCOLS       2               /* default number of columns */
@@ -68,11 +69,11 @@ enum StartingCorner {
 
 /* draw context */
 struct DC {
+	GC gc;
 	unsigned long windowcolors[STYLE_LAST][COLOR_LAST];
 	unsigned long desktopselbg;
 	unsigned long desktopbg;
 	unsigned long separator;
-	GC gc;
 };
 
 /* mini-desktop geometry */
@@ -85,12 +86,12 @@ struct Desktop {
 struct Client {
 	Window clientwin;
 	Window miniwin;
-	Pixmap icon;
+	Picture icon;
+	Pixmap pix;
 	size_t desk;
 	int cx, cy, cw, ch;
 	int x, y, w, h;
 	int ishidden;
-	int iconw, iconh;
 };
 
 /* the pager */
@@ -137,8 +138,9 @@ static Colormap colormap;
 static unsigned int depth;
 static int screen;
 static int screenw, screenh;
-static int wflag = 0;                   /* whether to start in withdrawn mode */
 static int running = 1;
+static int wflag = 0;                   /* whether to start in withdrawn mode */
+static int iflag = 0;                   /* whether to draw icons */
 
 #include "config.h"
 
@@ -199,8 +201,6 @@ xerror(Display *dpy, XErrorEvent *e)
 	    (e->request_code == X_ConfigureWindow && e->error_code == BadMatch) ||
 	    (e->request_code == X_ConfigureWindow && e->error_code == BadValue))
 		return 0;
-
-	errx(1, "Fatal request. Request code=%d, error code=%d", e->request_code, e->error_code);
 	return xerrorxlib(dpy, e);
 }
 
@@ -212,7 +212,7 @@ getoptions(int argc, char **argv)
 	int status;
 	char *s, *endp;
 
-	while ((ch = getopt(argc, argv, "c:g:l:o:w")) != -1) {
+	while ((ch = getopt(argc, argv, "c:g:il:o:w")) != -1) {
 		switch (ch) {
 		case 'c':
 			if (strpbrk(optarg, "Bb") != NULL) {
@@ -233,6 +233,9 @@ getoptions(int argc, char **argv)
 				config.xnegative = 1;
 			if (status & YNegative)
 				config.ynegative = 1;
+			break;
+		case 'i':
+			iflag = 1;
 			break;
 		case 'l':
 			s = optarg;
@@ -323,53 +326,132 @@ getatomprop(Window win, Atom prop, Atom **atoms)
 	return len;
 }
 
+static uint32_t
+prealpha(uint32_t p)
+{
+	uint8_t a = p >> 24u;
+	uint32_t rb = (a * (p & 0xFF00FFu)) >> 8u;
+	uint32_t g = (a * (p & 0x00FF00u)) >> 8u;
+	return (rb & 0xFF00FFu) | (g & 0x00FF00u) | (a << 24u);
+}
+
 static Pixmap
-geticonprop(Window win, int *iconw, int *iconh)
+geticccmicon(Window win, int *iconw, int *iconh, int *d)
+{
+	XWMHints *wmhints;
+	GC gc;
+	Pixmap pix = None;
+	Window dw;
+	int x, y, b;
+
+	if ((wmhints = XGetWMHints(dpy, win)) == NULL)
+		return None;
+	if (!(wmhints->flags & IconPixmapHint))
+		goto done;
+	pix = wmhints->icon_pixmap;
+	XGetGeometry(dpy, wmhints->icon_pixmap, &dw, &x, &y, iconw, iconh, &b, d);
+	pix = XCreatePixmap(dpy, root, *iconw, *iconh, *d);
+	gc = XCreateGC(dpy, pix, 0, NULL);
+	XSetForeground(dpy, gc, 1);
+	XFillRectangle(dpy, pix, gc, 0, 0, *iconw, *iconh);
+	XCopyArea(dpy, wmhints->icon_pixmap, pix, gc, 0, 0, *iconw, *iconh, 0, 0);
+done:
+	XFree(wmhints);
+	return pix;
+}
+
+static Pixmap
+getewmhicon(Window win, int *iconw, int *iconh, int *d)
 {
 	XImage *img;
+	GC gc;
 	Pixmap pix = None;
 	Atom da;
-	size_t size;
-	unsigned long *end, *data, *found = NULL;
+	size_t i, size;
+	uint32_t *data32;
+	unsigned long *q, *p, *end, *data = NULL;
 	unsigned long len, dl;
-	int w, h;                       /* dimensions of current icon */
+	int diff, mindiff = INT_MAX;
+	int w, h;
 	int format;
-	unsigned char *p = NULL;
 	char *datachr = NULL;
 
-	if (XGetWindowProperty(dpy, win, atoms[_NET_WM_ICON], 0L, UINT32_MAX, False, AnyPropertyType, &da, &format, &len, &dl, &p) != Success)
+	(void)d;
+	if (XGetWindowProperty(dpy, win, atoms[_NET_WM_ICON], 0L, UINT32_MAX, False, AnyPropertyType, &da, &format, &len, &dl, (unsigned char **)&q) != Success)
 		return None;
-	if (p == NULL)
+	if (q == NULL)
 		return None;
 	if (len == 0 || format != 32)
 		goto done;
-	for (data = (unsigned long *)p, end = data + len; data < end; data += size) {
-		w = *data++;
-		h = *data++;
+	for (p = q, end = p + len; p < end; p += size) {
+		w = *p++;
+		h = *p++;
 		size = w * h;
-		if (w < 1 || h < 1 || data + size > end)
+		if (w < 1 || h < 1 || p + size > end)
 			break;
-		if (max(w, h) == PREF_ICON_SIZE) {
+		diff = max(w, h) - ICON_SIZE;
+		if (diff >= 0 && diff < mindiff) {
 			*iconw = w;
 			*iconh = h;
-			found = data;
-			break;
+			data = p;
+			if (diff == 0) {
+				break;
+			}
 		}
 	}
-	if (found == NULL)
+	if (data == NULL)
 		goto done;
 	size = *iconw * *iconh;
-	datachr = ecalloc(size, sizeof(*datachr));
-	(void)memcpy(datachr, found, size);
-	if ((img = XCreateImage(dpy, visual, depth, ZPixmap, 0, datachr, *iconw, *iconh, 32, 0)) == NULL)
+	data32 = (uint32_t *)data;
+	for (i = 0; i < size; ++i)
+		data32[i] = prealpha(data[i]);
+	datachr = emalloc(size * sizeof(*data));
+	(void)memcpy(datachr, data32, size * sizeof(*data));
+	if ((img = XCreateImage(dpy, visual, 32, ZPixmap, 0, datachr, *iconw, *iconh, 32, 0)) == NULL)
 		goto done;
 	XInitImage(img);
-	pix = XCreatePixmap(dpy, root, *iconw, *iconh, depth);
-	XPutImage(dpy, pix, dc.gc, img, 0, 0, 0, 0, *iconw, *iconh);
+	pix = XCreatePixmap(dpy, root, *iconw, *iconh, 32);
+	gc = XCreateGC(dpy, pix, 0, NULL);
+	XPutImage(dpy, pix, gc, img, 0, 0, 0, 0, *iconw, *iconh);
+	XFreeGC(dpy, gc);
 	XDestroyImage(img);
 done:
-	XFree(p);
+	XFree(q);
 	return pix;
+}
+
+static Picture
+geticonprop(Window win)
+{
+	Pixmap pix;
+	Picture pic = None;
+	XRenderPictFormat xpf;
+	XTransform xf;
+	int iconw, iconh;
+	int icccm = 0;
+	int d;
+
+	if ((pix = getewmhicon(win, &iconw, &iconh, &d)) == None) {
+		pix = geticccmicon(win, &iconw, &iconh, &d);
+		icccm = 1;
+	}
+	if (pix == None)
+		return None;
+	xpf.depth = d;
+	xpf.type = PictTypeDirect;
+	if (icccm)
+		pic = XRenderCreatePicture(dpy, pix, XRenderFindFormat(dpy, PictFormatType | PictFormatDepth, &xpf, 0), 0, NULL);
+	else
+		pic = XRenderCreatePicture(dpy, pix, XRenderFindStandardFormat(dpy, PictStandardARGB32), 0, NULL);
+	XFreePixmap(dpy, pix);
+	if (max(iconw, iconh) != ICON_SIZE) {
+		XRenderSetPictureFilter(dpy, pic, FilterBilinear, NULL, 0);
+		xf.matrix[0][0] = (iconw << 16u) / ICON_SIZE; xf.matrix[0][1] = 0; xf.matrix[0][2] = 0;
+		xf.matrix[1][0] = 0; xf.matrix[1][1] = (iconh << 16u) / ICON_SIZE; xf.matrix[1][2] = 0;
+		xf.matrix[2][0] = 0; xf.matrix[2][1] = 0; xf.matrix[2][2] = 65536;
+		XRenderSetPictureTransform(dpy, pic, &xf);
+	}
+	return pic;
 }
 
 /* return non-zero if window is hidden */
@@ -438,6 +520,10 @@ cleanclient(struct Client *cp)
 		return;
 	if (cp->miniwin != None)
 		XDestroyWindow(dpy, cp->miniwin);
+	if (cp->icon != None)
+		XRenderFreePicture(dpy, cp->icon);
+	if (cp->pix != None)
+		XFreePixmap(dpy, cp->pix);
 	free(cp);
 }
 
@@ -497,18 +583,6 @@ setndesktops(void)
 	}
 }
 
-/* return from client list the client with given mini window */
-static struct Client *
-getminiclient(Window win)
-{
-	size_t i;
-
-	for (i = 0; i < pager.nclients; i++)
-		if (pager.clients[i] != NULL && pager.clients[i]->miniwin == win)
-			return pager.clients[i];
-	return NULL;
-}
-
 /* return from client list the client with given client window; and delete it from client list */
 static struct Client *
 getdelclient(Window win)
@@ -550,7 +624,8 @@ setclients(void)
 				CopyFromParent, CopyFromParent, CopyFromParent,
 				CWEventMask, &miniswa
 			);
-			clients[i]->icon = geticonprop(clients[i]->clientwin, &clients[i]->iconw, &clients[i]->iconh);
+			clients[i]->icon = iflag ? geticonprop(clients[i]->clientwin) : None;
+			clients[i]->pix = None;
 		}
 		if (XGetGeometry(dpy, wins[i], &dw, &x, &y, &clients[i]->cw, &clients[i]->ch, &b, &du) &&
 		    XTranslateCoordinates(dpy, wins[i], root, x, y, &clients[i]->cx, &clients[i]->cy, &dw)) {
@@ -660,24 +735,34 @@ mapclient(struct Client *cp)
 {
 	struct Desktop *dp;
 	int style;
+	Picture pic;
 
 	if (cp == NULL)
 		return;
-	style = (cp->clientwin == pager.active) ? STYLE_ACTIVE : STYLE_INACTIVE;
-	XSetWindowBackground(dpy, cp->miniwin, dc.windowcolors[style][COLOR_BACKGROUND]);
-	XSetWindowBorder(dpy, cp->miniwin, dc.windowcolors[style][COLOR_BORDER]);
 	if (cp->ishidden || cp->desk < 0 || cp->desk >= pager.ndesktops) {
 		XUnmapWindow(dpy, cp->miniwin);
-	} else {
-		dp = pager.desktops[cp->desk];
-		cp->x = cp->cx * dp->w / screenw;
-		cp->y = cp->cy * dp->h / screenh;
-		cp->w = cp->cw * dp->w / screenw;
-		cp->h = cp->ch * dp->h / screenh;
-		XReparentWindow(dpy, cp->miniwin, dp->miniwin, cp->x, cp->y);
-		XMoveResizeWindow(dpy, cp->miniwin, cp->x, cp->y, cp->w, cp->h);
-		XMapWindow(dpy, cp->miniwin);
+		return;
 	}
+	dp = pager.desktops[cp->desk];
+	cp->x = cp->cx * dp->w / screenw;
+	cp->y = cp->cy * dp->h / screenh;
+	cp->w = cp->cw * dp->w / screenw;
+	cp->h = cp->ch * dp->h / screenh;
+	style = (cp->clientwin == pager.active) ? STYLE_ACTIVE : STYLE_INACTIVE;
+	XSetWindowBorder(dpy, cp->miniwin, dc.windowcolors[style][COLOR_BORDER]);
+	if (cp->pix != None)
+		XFreePixmap(dpy, cp->pix);
+	cp->pix = XCreatePixmap(dpy, cp->miniwin, cp->w, cp->h, depth);
+	XSetForeground(dpy, dc.gc, dc.windowcolors[style][COLOR_BACKGROUND]);
+	XFillRectangle(dpy, cp->pix, dc.gc, 0, 0, cp->w, cp->h);
+	if (cp->icon != None) {
+		pic = XRenderCreatePicture(dpy, cp->pix, XRenderFindVisualFormat(dpy, visual), 0, NULL);
+		XRenderComposite(dpy, PictOpOver, cp->icon, None, pic, 0, 0, 0, 0, (cp->w - ICON_SIZE) / 2, (cp->h - ICON_SIZE) / 2, cp->w, cp->h);
+	}
+	XSetWindowBackgroundPixmap(dpy, cp->miniwin, cp->pix);
+	XReparentWindow(dpy, cp->miniwin, dp->miniwin, cp->x, cp->y);
+	XMoveResizeWindow(dpy, cp->miniwin, cp->x, cp->y, cp->w, cp->h);
+	XMapWindow(dpy, cp->miniwin);
 }
 
 /* remap all client miniwindows */
@@ -982,14 +1067,11 @@ xeventpropertynotify(XEvent *e)
 static void
 xeventexpose(XEvent *e)
 {
-	struct Client *cp;
 	XExposeEvent *ev;
 
 	ev = &e->xexpose;
 	if (ev->window == pager.win) {
 		XCopyArea(dpy, pager.pix, pager.win, dc.gc, 0, 0, pager.w, pager.h, 0, 0);
-	} else if ((cp = getminiclient(ev->window)) != NULL && cp->icon != None) {
-		XCopyArea(dpy, cp->icon, cp->miniwin, dc.gc, 0, 0, cp->w, cp->h, (cp->w - cp->iconw) / 2, (cp->h - cp->iconh) / 2);
 	}
 }
 
