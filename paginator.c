@@ -1,5 +1,7 @@
 #include <err.h>
+#include <limits.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -9,6 +11,7 @@
 #include <X11/Xutil.h>
 
 #define PROGNAME        "Paginator"
+#define PREF_ICON_SIZE  16              /* preferred icon size */
 #define MAX_DESKTOPS    100             /* maximum number of desktops */
 #define DEF_WIDTH       125             /* default width for the pager */
 #define DEF_NCOLS       2               /* default number of columns */
@@ -42,6 +45,7 @@ enum {
 	_NET_SHOWING_DESKTOP,
 	_NET_MOVERESIZE_WINDOW,
 	_NET_NUMBER_OF_DESKTOPS,
+	_NET_WM_ICON,
 	_NET_WM_STATE,
 	_NET_WM_STATE_HIDDEN,
 
@@ -81,10 +85,12 @@ struct Desktop {
 struct Client {
 	Window clientwin;
 	Window miniwin;
+	Pixmap icon;
 	size_t desk;
 	int cx, cy, cw, ch;
 	int x, y, w, h;
 	int ishidden;
+	int iconw, iconh;
 };
 
 /* the pager */
@@ -125,6 +131,7 @@ static struct Pager pager = {0};
 static struct DC dc;
 static Atom atoms[ATOM_LAST];
 static Display *dpy;
+static Visual *visual;
 static Window root;
 static Colormap colormap;
 static unsigned int depth;
@@ -316,6 +323,55 @@ getatomprop(Window win, Atom prop, Atom **atoms)
 	return len;
 }
 
+static Pixmap
+geticonprop(Window win, int *iconw, int *iconh)
+{
+	XImage *img;
+	Pixmap pix = None;
+	Atom da;
+	size_t size;
+	unsigned long *end, *data, *found = NULL;
+	unsigned long len, dl;
+	int w, h;                       /* dimensions of current icon */
+	int format;
+	unsigned char *p = NULL;
+	char *datachr = NULL;
+
+	if (XGetWindowProperty(dpy, win, atoms[_NET_WM_ICON], 0L, UINT32_MAX, False, AnyPropertyType, &da, &format, &len, &dl, &p) != Success)
+		return None;
+	if (p == NULL)
+		return None;
+	if (len == 0 || format != 32)
+		goto done;
+	for (data = (unsigned long *)p, end = data + len; data < end; data += size) {
+		w = *data++;
+		h = *data++;
+		size = w * h;
+		if (w < 1 || h < 1 || data + size > end)
+			break;
+		if (max(w, h) == PREF_ICON_SIZE) {
+			*iconw = w;
+			*iconh = h;
+			found = data;
+			break;
+		}
+	}
+	if (found == NULL)
+		goto done;
+	size = *iconw * *iconh;
+	datachr = ecalloc(size, sizeof(*datachr));
+	(void)memcpy(datachr, found, size);
+	if ((img = XCreateImage(dpy, visual, depth, ZPixmap, 0, datachr, *iconw, *iconh, 32, 0)) == NULL)
+		goto done;
+	XInitImage(img);
+	pix = XCreatePixmap(dpy, root, *iconw, *iconh, depth);
+	XPutImage(dpy, pix, dc.gc, img, 0, 0, 0, 0, *iconw, *iconh);
+	XDestroyImage(img);
+done:
+	XFree(p);
+	return pix;
+}
+
 /* return non-zero if window is hidden */
 static int
 ishidden(Window win)
@@ -441,9 +497,21 @@ setndesktops(void)
 	}
 }
 
-/* search client list for a client for the given window */
+/* return from client list the client with given mini window */
 static struct Client *
-getclient(Window win)
+getminiclient(Window win)
+{
+	size_t i;
+
+	for (i = 0; i < pager.nclients; i++)
+		if (pager.clients[i] != NULL && pager.clients[i]->miniwin == win)
+			return pager.clients[i];
+	return NULL;
+}
+
+/* return from client list the client with given client window; and delete it from client list */
+static struct Client *
+getdelclient(Window win)
 {
 	struct Client *cp;
 	size_t i;
@@ -473,7 +541,7 @@ setclients(void)
 	nclients = getwinprop(root, atoms[_NET_CLIENT_LIST_STACKING], &wins);
 	clients = ecalloc(nclients, sizeof(*clients));
 	for (i = 0; i < nclients; i++) {
-		if ((clients[i] = getclient(wins[i])) == NULL) {
+		if ((clients[i] = getdelclient(wins[i])) == NULL) {
 			clients[i] = emalloc(sizeof(*clients[i]));
 			clients[i]->clientwin = wins[i];
 			XSelectInput(dpy, clients[i]->clientwin, StructureNotifyMask);
@@ -482,6 +550,7 @@ setclients(void)
 				CopyFromParent, CopyFromParent, CopyFromParent,
 				CWEventMask, &miniswa
 			);
+			clients[i]->icon = geticonprop(clients[i]->clientwin, &clients[i]->iconw, &clients[i]->iconh);
 		}
 		if (XGetGeometry(dpy, wins[i], &dw, &x, &y, &clients[i]->cw, &clients[i]->ch, &b, &du) &&
 		    XTranslateCoordinates(dpy, wins[i], root, x, y, &clients[i]->cx, &clients[i]->cy, &dw)) {
@@ -672,6 +741,7 @@ initatoms(void)
 		[_NET_SHOWING_DESKTOP]          = "_NET_SHOWING_DESKTOP",
 		[_NET_MOVERESIZE_WINDOW]        = "_NET_MOVERESIZE_WINDOW",
 		[_NET_NUMBER_OF_DESKTOPS]       = "_NET_NUMBER_OF_DESKTOPS",
+		[_NET_WM_ICON]                  = "_NET_WM_ICON",
 		[_NET_WM_STATE]                 = "_NET_WM_STATE",
 		[_NET_WM_STATE_HIDDEN]          = "_NET_WM_STATE_HIDDEN",
 	};
@@ -912,11 +982,14 @@ xeventpropertynotify(XEvent *e)
 static void
 xeventexpose(XEvent *e)
 {
+	struct Client *cp;
 	XExposeEvent *ev;
 
 	ev = &e->xexpose;
 	if (ev->window == pager.win) {
 		XCopyArea(dpy, pager.pix, pager.win, dc.gc, 0, 0, pager.w, pager.h, 0, 0);
+	} else if ((cp = getminiclient(ev->window)) != NULL && cp->icon != None) {
+		XCopyArea(dpy, cp->icon, cp->miniwin, dc.gc, 0, 0, cp->w, cp->h, (cp->w - cp->iconw) / 2, (cp->h - cp->iconh) / 2);
 	}
 }
 
@@ -936,6 +1009,7 @@ main(int argc, char *argv[])
 	if ((dpy = XOpenDisplay(NULL)) == NULL)
 		errx(1, "could not open display");
 	screen = DefaultScreen(dpy);
+	visual = DefaultVisual(dpy, screen);
 	root = RootWindow(dpy, screen);
 	colormap = DefaultColormap(dpy, screen);
 	depth = DefaultDepth(dpy, screen);
