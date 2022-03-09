@@ -3,7 +3,7 @@
 paginator \- X11 desktop pager
 .SH SYNOPSIS
 .B paginator
-.RB [ \-w ]
+.RB [ \-iw ]
 .RB [ \-c
 .IR corner ]
 .RB [ \-g
@@ -36,6 +36,9 @@ The argument for this option must be a geometry specification recognized by
 .IR XParseGeometry (1)
 If not provided, the window size will be computed from
 the pager layout, the number of desktops and the size of the screen.
+.TP
+.B \-i
+Draw window icons on the pager.
 .TP
 \fB\-l\fP \fIlayout\fP
 Specify the layout of the pager.
@@ -78,9 +81,3 @@ The display to start
 on.
 .SH SEE ALSO
 .IR X (1)
-.SH BUGS
-.B Paginator
-does not move client windows by moving the mini windows in the pager.
-It does not show the icon name nor the icon of the client windows in the pager.
-It also does not have an option to present itself to the window manager as a panel/bar.
-Those features may be added in a later version.

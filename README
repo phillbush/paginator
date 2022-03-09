@@ -4,7 +4,7 @@ NAME
      paginator - X11 desktop pager
 
 SYNOPSIS
-     paginator [-w] [-c corner] [-g geometry] [-l layout] [-o orientation]
+     paginator [-iw] [-c corner] [-g geometry] [-l layout] [-o orientation]
 
 DESCRIPTION
      paginator is a desktop pager for X11 that provides to the user a GUI
@@ -24,6 +24,8 @@ DESCRIPTION
           must be a geometry specification recognized by XParseGeometry(1) If
           not provided, the window size will be computed from the pager
           layout, the number of desktops and the size of the screen.
+
+     -i   Draw window icons on the pager.
 
      -l layout
           Specify the layout of the pager.  The argument for this option must
@@ -53,12 +55,5 @@ ENVIRONMENT
 
 SEE ALSO
      X(1)
-
-BUGS
-     Paginator does not move client windows by moving the mini windows in the
-     pager.  It does not show the icon name nor the icon of the client windows
-     in the pager.  It also does not have an option to present itself to the
-     window manager as a panel/bar.  Those features may be added in a later
-     version.
 
                                                                   PAGINATOR(1)
