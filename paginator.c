@@ -749,8 +749,11 @@ static void
 mapclient(struct Client *cp)
 {
 	struct Desktop *dp;
-	int style;
 	Picture pic;
+	Window dw;
+	unsigned int du, b;
+	int style;
+	int x, y;
 
 	if (cp == NULL)
 		return;
@@ -758,6 +761,8 @@ mapclient(struct Client *cp)
 		unmapclient(cp);
 		return;
 	}
+	XGetGeometry(dpy, cp->clientwin, &dw, &x, &y, &cp->cw, &cp->ch, &b, &du);
+	XTranslateCoordinates(dpy, cp->clientwin, root, x, y, &cp->cx, &cp->cy, &dw);
 	dp = pager.desktops[cp->desk];
 	cp->x = cp->cx * dp->w / screenw;
 	cp->y = cp->cy * dp->h / screenh;
