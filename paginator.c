@@ -643,7 +643,7 @@ setclients(void)
 				.ismapped = 0,
 			};
 			clients[i]->clientwin = wins[i];
-			XSelectInput(dpy, clients[i]->clientwin, StructureNotifyMask);
+			XSelectInput(dpy, clients[i]->clientwin, StructureNotifyMask | PropertyChangeMask);
 			clients[i]->miniwin = XCreateWindow(
 				dpy, pager.win, 0, 0, 1, 1, 1,
 				CopyFromParent, CopyFromParent, CopyFromParent,
@@ -768,13 +768,11 @@ unmapclient(struct Client *cp)
 static void
 drawclient(struct Client *cp)
 {
-	struct Desktop *dp;
 	Picture pic;
 	int style;
 
-	if (cp == NULL || cp->desk < 0 || cp->desk >= pager.ndesktops)
+	if (cp == NULL)
 		return;
-	dp = pager.desktops[cp->desk];
 	style = (cp == pager.active) ? STYLE_ACTIVE : STYLE_INACTIVE;
 	XSetWindowBorder(dpy, cp->miniwin, dc.windowcolors[style][COLOR_BORDER]);
 	if (cp->pix != None)
@@ -786,7 +784,19 @@ drawclient(struct Client *cp)
 		pic = XRenderCreatePicture(dpy, cp->pix, XRenderFindVisualFormat(dpy, visual), 0, NULL);
 		XRenderComposite(dpy, PictOpOver, cp->icon, None, pic, 0, 0, 0, 0, (cp->w - ICON_SIZE) / 2, (cp->h - ICON_SIZE) / 2, cp->w, cp->h);
 	}
+	XCopyArea(dpy, cp->pix, cp->miniwin, dc.gc, 0, 0, cp->w, cp->h, 0, 0);
 	XSetWindowBackgroundPixmap(dpy, cp->miniwin, cp->pix);
+}
+
+/* remap client miniwindow into its desktop miniwindow */
+static void
+reparentclient(struct Client *cp)
+{
+	struct Desktop *dp;
+
+	if (cp == NULL || cp->desk < 0 || cp->desk >= pager.ndesktops)
+		return;
+	dp = pager.desktops[cp->desk];
 	XReparentWindow(dpy, cp->miniwin, dp->miniwin, cp->x, cp->y);
 }
 
@@ -818,6 +828,7 @@ mapclient(struct Client *cp)
 		XMapWindow(dpy, cp->miniwin);
 		cp->ismapped = 1;
 	}
+	reparentclient(cp);
 }
 
 /* remap all client miniwindows */
@@ -1120,7 +1131,7 @@ xeventpropertynotify(XEvent *e)
 	} else if (ev->atom == atoms[_NET_WM_STATE]) {
 		// TODO
 	} else if (ev->atom == atoms[_NET_WM_DESKTOP]) {
-		// TODO
+		reparentclient(getclient(ev->window));
 	}
 }
 
