@@ -613,6 +613,24 @@ getdelclient(Window win)
 	return NULL;
 }
 
+/* set hidden state of given client */
+static void
+sethiddenstate(struct Client *cp)
+{
+	if (cp == NULL)
+		return;
+	cp->ishidden = ishidden(cp->clientwin);
+}
+
+/* set client's desktop number */
+static void
+setdesktop(struct Client *cp)
+{
+	if (cp == NULL)
+		return;
+	cp->desk = getcardprop(cp->clientwin, atoms[_NET_WM_DESKTOP]);
+}
+
 /* update list of clients; return nonzero if list of clients has changed */
 static int
 setclients(void)
@@ -653,8 +671,8 @@ setclients(void)
 		}
 		if (XGetGeometry(dpy, wins[i], &dw, &x, &y, &clients[i]->cw, &clients[i]->ch, &b, &du) &&
 		    XTranslateCoordinates(dpy, wins[i], root, x, y, &clients[i]->cx, &clients[i]->cy, &dw)) {
-			clients[i]->ishidden = ishidden(clients[i]->clientwin);
-			clients[i]->desk = getcardprop(clients[i]->clientwin, atoms[_NET_WM_DESKTOP]);
+			sethiddenstate(clients[i]);
+			setdesktop(clients[i]);
 		} else {
 			cleanclient(clients[i]);
 			clients[i] = NULL;
@@ -1103,7 +1121,7 @@ xeventconfigurenotify(XEvent *e)
 static void
 xeventpropertynotify(XEvent *e)
 {
-	struct Client *prevactive;
+	struct Client *cp, *prevactive;
 	XPropertyEvent *ev;
 
 	ev = &e->xproperty;
@@ -1129,9 +1147,15 @@ xeventpropertynotify(XEvent *e)
 		drawpager();
 		mapdesktops();
 	} else if (ev->atom == atoms[_NET_WM_STATE]) {
-		// TODO
+		if ((cp = getclient(ev->window)) != NULL) {
+			sethiddenstate(cp);
+			mapclient(cp);
+		}
 	} else if (ev->atom == atoms[_NET_WM_DESKTOP]) {
-		reparentclient(getclient(ev->window));
+		if ((cp = getclient(ev->window)) != NULL) {
+			setdesktop(cp);
+			reparentclient(cp);
+		}
 	}
 }
 
