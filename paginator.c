@@ -1028,9 +1028,9 @@ initpager(int argc, char *argv[])
 	XMapWindow(dpy, pager.win);
 }
 
-/* change current desktop to the one corresponding to the region under pointer */
+/* if win is a mini-client-window, focus its client; if it's a mini-desk-window, change to its desktop */
 static void
-changedesk(Window win)
+focus(Window win)
 {
 	size_t i;
 
@@ -1048,7 +1048,7 @@ changedesk(Window win)
 	}
 }
 
-/* handle button release events */
+/* act upon mouse button presses; basically focus window and change to its desktop */
 static void
 xeventbuttonrelease(XEvent *e)
 {
@@ -1056,11 +1056,11 @@ xeventbuttonrelease(XEvent *e)
 
 	ev = &e->xbutton;
 	if (ev->button == Button1) {
-		changedesk(ev->window);
+		focus(ev->window);
 	}
 }
 
-/* handle client message events; basically the close window message */
+/* close paginator when receiving WM_DELETE_WINDOW */
 static void
 xeventclientmessage(XEvent *e)
 {
@@ -1072,7 +1072,7 @@ xeventclientmessage(XEvent *e)
 	}
 }
 
-/* handle configure notify events */
+/* act upon configuration change (paginator watches clients' configuration changes) */
 static void
 xeventconfigurenotify(XEvent *e)
 {
@@ -1099,7 +1099,7 @@ xeventconfigurenotify(XEvent *e)
 	}
 }
 
-/* handle property notify events */
+/* act upon property change (paginator watches root's and clients' property changes) */
 static void
 xeventpropertynotify(XEvent *e)
 {
@@ -1135,7 +1135,7 @@ xeventpropertynotify(XEvent *e)
 	}
 }
 
-/* handle expose events */
+/* redraw the pager window when exposed */
 static void
 xeventexpose(XEvent *e)
 {
