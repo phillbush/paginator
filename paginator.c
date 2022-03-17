@@ -836,7 +836,7 @@ sethiddenandmap(struct Client *cp, int remap)
 		return;
 	previshidden = cp->ishidden;
 	cp->ishidden = ishidden(cp->clientwin);
-	if (remap || previshidden != cp->ishidden) {
+	if (remap && previshidden != cp->ishidden) {
 		mapclient(cp);
 	}
 }
@@ -861,14 +861,20 @@ static void
 setclients(void)
 {
 	struct Client **clients;
+	struct Client *oldcp;
 	Window *wins;
 	size_t nclients;
 	size_t i;
+	int changed;
 
+	changed = 0;
 	nclients = getwinprop(root, atoms[_NET_CLIENT_LIST_STACKING], &wins);
 	clients = ecalloc(nclients, sizeof(*clients));
 	for (i = 0; i < nclients; i++) {
+		oldcp = pager.nclients > 0 ? pager.clients[i] : NULL;
 		clients[i] = getdelclient(wins[i]);
+		if (oldcp == NULL || clients[i] == NULL || clients[i] != oldcp)
+			changed = 1;
 		if (clients[i] == NULL) {
 			clients[i] = emalloc(sizeof(*clients[i]));
 			*clients[i] = (struct Client) {
@@ -885,13 +891,16 @@ setclients(void)
 			);
 			clients[i]->icon = iflag ? geticonprop(clients[i]->clientwin) : None;
 		}
-		sethiddenandmap(clients[i], 1);
+		sethiddenandmap(clients[i], 0);
 		setdesktop(clients[i]);
 	}
 	cleanclients();
 	pager.clients = clients;
 	pager.nclients = nclients;
 	XFree(wins);
+	if (changed) {
+		mapclients();
+	}
 }
 
 /* update showing desktop state */
@@ -1188,7 +1197,7 @@ xeventpropertynotify(XEvent *e)
 		setndesktops();
 	} else if (ev->atom == atoms[_NET_WM_STATE]) {
 		/* the list of states of a window (which may or may not include its hidden state) was reset */
-		sethiddenandmap(getclient(ev->window), 0);
+		sethiddenandmap(getclient(ev->window), 1);
 	} else if (ev->atom == atoms[_NET_WM_DESKTOP]) {
 		/* the desktop of a window was reset */
 		setdesktop(getclient(ev->window));
