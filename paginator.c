@@ -367,8 +367,10 @@ geticccmicon(Window win, int *iconw, int *iconh, int *d)
 		return None;
 	if (!(wmhints->flags & IconPixmapHint))
 		goto done;
-	pix = wmhints->icon_pixmap;
-	XGetGeometry(dpy, wmhints->icon_pixmap, &dw, &x, &y, iconw, iconh, &b, d);
+	if (!XGetGeometry(dpy, wmhints->icon_pixmap, &dw, &x, &y, iconw, iconh, &b, d))
+		goto done;
+	if (*iconw < 1 || *iconh < 1)
+		goto done;
 	pix = XCreatePixmap(dpy, root, *iconw, *iconh, *d);
 	gc = XCreateGC(dpy, pix, 0, NULL);
 	XSetForeground(dpy, gc, 1);
@@ -402,6 +404,7 @@ getewmhicon(Window win, int *iconw, int *iconh, int *d)
 		return None;
 	if (len == 0 || format != 32)
 		goto done;
+	*iconw = *iconh = 0;
 	for (p = q, end = p + len; p < end; p += size) {
 		w = *p++;
 		h = *p++;
@@ -721,10 +724,10 @@ mapclient(struct Client *cp)
 	XGetGeometry(dpy, cp->clientwin, &dw, &x, &y, &cp->cw, &cp->ch, &b, &du);
 	XTranslateCoordinates(dpy, cp->clientwin, root, x, y, &cp->cx, &cp->cy, &dw);
 	dp = pager.desktops[cp->desk];
-	cp->x = cp->cx * dp->w / screenw;
-	cp->y = cp->cy * dp->h / screenh;
-	cp->w = cp->cw * dp->w / screenw;
-	cp->h = cp->ch * dp->h / screenh;
+	cp->x = max(1, cp->cx * dp->w / screenw);
+	cp->y = max(1, cp->cy * dp->h / screenh);
+	cp->w = max(1, cp->cw * dp->w / screenw);
+	cp->h = max(1, cp->ch * dp->h / screenh);
 	drawclient(cp);
 	XMoveResizeWindow(dpy, cp->miniwin, cp->x, cp->y, cp->w, cp->h);
 	if (!cp->ismapped) {
