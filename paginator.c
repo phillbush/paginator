@@ -17,9 +17,9 @@
 #define DEF_WIDTH       125             /* default width for the pager */
 #define DEF_NCOLS       2               /* default number of columns */
 #define SEPARATOR_SIZE  1               /* size of the line between minidesktops */
+#define BORDER_SIZE     1               /* size of the miniwindow borders */
 #define RESIZETIME      64              /* time to redraw containers during resizing */
 #define PAGER_ACTION    ((long)(1 << 14))
-#define SEPARATOR(x)    ((x) * SEPARATOR_SIZE)
 
 /* colors */
 enum {
@@ -724,10 +724,10 @@ mapclient(struct Client *cp)
 	XGetGeometry(dpy, cp->clientwin, &dw, &x, &y, &cp->cw, &cp->ch, &b, &du);
 	XTranslateCoordinates(dpy, cp->clientwin, root, x, y, &cp->cx, &cp->cy, &dw);
 	dp = pager.desktops[cp->desk];
-	cp->x = max(1, cp->cx * dp->w / screenw);
-	cp->y = max(1, cp->cy * dp->h / screenh);
-	cp->w = max(1, cp->cw * dp->w / screenw);
-	cp->h = max(1, cp->ch * dp->h / screenh);
+	cp->x = cp->cx * dp->w / screenw;
+	cp->y = cp->cy * dp->h / screenh;
+	cp->w = max(1, cp->cw * dp->w / screenw - 2 * BORDER_SIZE);     /* 2 for the left and right borders */
+	cp->h = max(1, cp->ch * dp->h / screenh - 2 * BORDER_SIZE);     /* 2 for the top and bottom borders */
 	drawclient(cp);
 	XMoveResizeWindow(dpy, cp->miniwin, cp->x, cp->y, cp->w, cp->h);
 	if (!cp->ismapped) {
@@ -888,7 +888,7 @@ setclients(void)
 			clients[i]->clientwin = wins[i];
 			XSelectInput(dpy, clients[i]->clientwin, StructureNotifyMask | PropertyChangeMask);
 			clients[i]->miniwin = XCreateWindow(
-				dpy, pager.win, 0, 0, 1, 1, 1,
+				dpy, pager.win, 0, 0, 1, 1, BORDER_SIZE,
 				CopyFromParent, CopyFromParent, CopyFromParent,
 				CWEventMask, &miniswa
 			);
@@ -1035,9 +1035,9 @@ initpager(int argc, char *argv[])
 	if (pager.w <= 0 && pager.h <= 0)
 		pager.w = DEF_WIDTH;
 	if (pager.w > 0 && pager.h <= 0)
-		pager.h = SEPARATOR(config.nrows) + (config.nrows * (pager.w - SEPARATOR(config.ncols)) * screenh) / (config.ncols * screenw);
+		pager.h = (SEPARATOR_SIZE * config.nrows) + (config.nrows * (pager.w - (SEPARATOR_SIZE * config.ncols)) * screenh) / (config.ncols * screenw);
 	if (pager.w <= 0 && pager.h > 0)
-		pager.w = SEPARATOR(config.ncols) + (config.ncols * (pager.h - SEPARATOR(config.nrows)) * screenw) / (config.nrows * screenh);
+		pager.w = (SEPARATOR_SIZE * config.ncols) + (config.ncols * (pager.h - (SEPARATOR_SIZE * config.nrows)) * screenw) / (config.nrows * screenh);
 
 	/* compute user-defined pager position */
 	if (config.xnegative)

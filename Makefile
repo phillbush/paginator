@@ -10,10 +10,6 @@ X11LIB ?= /usr/X11R6/lib
 INCS += -I${LOCALINC} -I${X11INC}
 LIBS += -L${LOCALLIB} -L${X11LIB} -lX11 -lXinerama -lXrender
 
-# flags
-CFLAGS += -g -O0 -Wall -Wextra ${INCS} ${CPPFLAGS}
-LDFLAGS += ${LIBS}
-
 # files
 PROG = paginator
 SRCS = ${PROG:=.c}
@@ -22,24 +18,24 @@ OBJS = ${SRCS:.c=.o}
 all: ${PROG}
 
 ${PROG}: ${OBJS}
-	${CC} -o $@ ${OBJS} ${LDFLAGS}
+	${CC} -o $@ ${OBJS} ${LIBS} ${LDFLAGS}
 
 ${OBJS}: config.h
 
 .c.o:
-	${CC} ${CFLAGS} -c $<
+	${CC} ${INCS} ${CFLAGS} ${CPPFLAGS} -c $<
+
+clean:
+	-rm -f ${OBJS} ${PROG} ${PROG:=.core}
 
 install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
-	install -m 755 ${PROG} ${DESTDIR}${PREFIX}/bin/${PROG}
 	mkdir -p ${DESTDIR}${MANPREFIX}/man1
-	install -m 644 ${PROG}.1 ${DESTDIR}${MANPREFIX}/man1/${PROG}.1
+	${INSTALL} -m 755 ${PROG} ${DESTDIR}${PREFIX}/bin/${PROG}
+	${INSTALL} -m 644 ${PROG}.1 ${DESTDIR}${MANPREFIX}/man1/${PROG}.1
 
 uninstall:
-	rm -f ${DESTDIR}/${PREFIX}/bin/${PROG}
-	rm -f ${DESTDIR}/${MANPREFIX}/man1/${PROG}.1
-
-clean:
-	-rm ${OBJS} ${PROG}
+	rm -f ${DESTDIR}${PREFIX}/bin/${PROG}
+	rm -f ${DESTDIR}${MANPREFIX}/man1/${PROG}.1
 
 .PHONY: all install uninstall clean
