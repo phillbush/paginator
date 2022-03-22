@@ -3,6 +3,9 @@ struct Config config = {
 	.ncols = 2,
 	.nrows = 0,
 
+	/* size of 3D shadow effect; must be a small number */
+	.shadowthickness = 2,
+
 	/* desktop orientation */
 	.orient = _NET_WM_ORIENTATION_HORZ,
 
@@ -10,11 +13,11 @@ struct Config config = {
 	.corner = _NET_WM_TOPLEFT,
 
 	/* colors */
-	.windowcolors[STYLE_ACTIVE][COLOR_BACKGROUND]   = "#729FCF",
-	.windowcolors[STYLE_ACTIVE][COLOR_BORDER]       = "#204A87",
-	.windowcolors[STYLE_INACTIVE][COLOR_BACKGROUND] = "#555753",
-	.windowcolors[STYLE_INACTIVE][COLOR_BORDER]     = "#888A85",
-	.desktopselbg    = "#2E3436",
+	.windowcolors = {
+		[STYLE_ACTIVE]   = {"#3465A4", "#729FCF", "#204A87"},
+		[STYLE_INACTIVE] = {"#555753", "#888A85", "#2E3436"},
+	},
+	.desktopselbg    = "#BABDB6",
 	.desktopbg       = "#121212",
 	.separator       = "#888A85",
 };

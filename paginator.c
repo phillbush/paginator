@@ -8,6 +8,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xproto.h>
+#include <X11/Xresource.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/Xrender.h>
 
@@ -17,14 +18,14 @@
 #define DEF_WIDTH       125             /* default width for the pager */
 #define DEF_NCOLS       2               /* default number of columns */
 #define SEPARATOR_SIZE  1               /* size of the line between minidesktops */
-#define BORDER_SIZE     1               /* size of the miniwindow borders */
 #define RESIZETIME      64              /* time to redraw containers during resizing */
 #define PAGER_ACTION    ((long)(1 << 14))
 
 /* colors */
 enum {
-	COLOR_BACKGROUND,
-	COLOR_BORDER,
+	COLOR_MID,
+	COLOR_LIGHT,
+	COLOR_DARK,
 	COLOR_LAST
 };
 
@@ -87,7 +88,6 @@ struct Client {
 	Window clientwin;
 	Window miniwin;
 	Picture icon;
-	Pixmap pix;
 	unsigned long desk;
 	int cx, cy, cw, ch;
 	int x, y, w, h;
@@ -112,16 +112,19 @@ struct Pager {
 
 /* configuration structure */
 struct Config {
-	int nrows, ncols;
-	int x, y;
-	int userplaced;
-	int xnegative, ynegative;
-	enum Orientation orient;
-	enum StartingCorner corner;
-	const char *windowcolors[STYLE_LAST][COLOR_LAST];
+	int nrows, ncols;                       /* number of rows and columns in the pager grid */
+	int x, y;                               /* user-defined pager placement */
+	int xnegative, ynegative;               /* whether user-defined x and y placement are negative */
+	int userplaced;                         /* whether user defined pager placement */
+	int shadowthickness;                    /* thickness of the miniwindow shadows */
+	enum Orientation orient;                /* desktop orientation */
+	enum StartingCorner corner;             /* desktop initial corner */
+
+	/* color names */
 	const char *desktopselbg;
 	const char *desktopbg;
 	const char *separator;
+	const char *windowcolors[STYLE_LAST][COLOR_LAST];
 };
 
 /* X stuff */
@@ -130,11 +133,13 @@ static struct DC dc;
 static Atom atoms[ATOM_LAST];
 static Display *dpy;
 static Visual *visual;
+static XrmDatabase xdb = NULL;
 static Window root;
 static Colormap colormap;
 static unsigned int depth;
 static int screen;
 static int screenw, screenh;
+static char *xrm = NULL;
 
 /* window attributes for miniwindows */
 static XSetWindowAttributes miniswa = {
@@ -221,6 +226,68 @@ xerror(Display *dpy, XErrorEvent *e)
 	    (e->request_code == X_ConfigureWindow && e->error_code == BadValue))
 		return 0;
 	return xerrorxlib(dpy, e);
+}
+
+/* read xrdb for configuration options */
+static void
+getresources(void)
+{
+	long n;
+	char *type;
+	XrmValue xval;
+
+	if (xrm == NULL || xdb == NULL)
+		return;
+
+	if (XrmGetResource(xdb, "paginator.activeBackground", "*", &type, &xval) == True)
+		config.windowcolors[STYLE_ACTIVE][COLOR_MID] = xval.addr;
+	if (XrmGetResource(xdb, "paginator.activeTopShadowColor", "*", &type, &xval) == True)
+		config.windowcolors[STYLE_ACTIVE][COLOR_LIGHT] = xval.addr;
+	if (XrmGetResource(xdb, "paginator.activeBottomShadowColor", "*", &type, &xval) == True)
+		config.windowcolors[STYLE_ACTIVE][COLOR_DARK] = xval.addr;
+
+	if (XrmGetResource(xdb, "paginator.inactiveBackground", "*", &type, &xval) == True)
+		config.windowcolors[STYLE_INACTIVE][COLOR_MID] = xval.addr;
+	if (XrmGetResource(xdb, "paginator.inactiveTopShadowColor", "*", &type, &xval) == True)
+		config.windowcolors[STYLE_INACTIVE][COLOR_LIGHT] = xval.addr;
+	if (XrmGetResource(xdb, "paginator.inactiveBottomShadowColor", "*", &type, &xval) == True)
+		config.windowcolors[STYLE_INACTIVE][COLOR_DARK] = xval.addr;
+
+	if (XrmGetResource(xdb, "paginator.background", "*", &type, &xval) == True)
+		config.desktopbg = xval.addr;
+	if (XrmGetResource(xdb, "paginator.selbackground", "*", &type, &xval) == True)
+		config.desktopselbg = xval.addr;
+	if (XrmGetResource(xdb, "paginator.separator", "*", &type, &xval) == True)
+		config.separator = xval.addr;
+
+	if (XrmGetResource(xdb, "paginator.numColumns", "*", &type, &xval) == True)
+		if ((n = strtol(xval.addr, NULL, 10)) > 0 && n < 100)
+			config.ncols = n;
+	if (XrmGetResource(xdb, "paginator.numRows", "*", &type, &xval) == True)
+		if ((n = strtol(xval.addr, NULL, 10)) > 0 && n < 100)
+			config.nrows = n;
+	if (XrmGetResource(xdb, "paginator.shadowThickness", "*", &type, &xval) == True)
+		if ((n = strtol(xval.addr, NULL, 10)) > 0 && n < 100)
+			config.shadowthickness = n;
+
+	if (XrmGetResource(xdb, "paginator.orientation", "*", &type, &xval) == True) {
+		if (xval.addr[0] == 'h' || xval.addr[0] == 'H') {
+			config.orient = _NET_WM_ORIENTATION_HORZ;
+		} else if (xval.addr[0] == 'v' || xval.addr[0] == 'V') {
+			config.orient = _NET_WM_ORIENTATION_VERT;
+		}
+	}
+	if (XrmGetResource(xdb, "paginator.startingCorner", "*", &type, &xval) == True) {
+		if (strcasecmp(xval.addr, "TOPLEFT") == 0) {
+			config.corner = _NET_WM_TOPLEFT;
+		} else if (strcasecmp(xval.addr, "TOPRIGHT") == 0) {
+			config.corner = _NET_WM_TOPRIGHT;
+		} else if (strcasecmp(xval.addr, "TOPRIGHT") == 0) {
+			config.corner = _NET_WM_BOTTOMLEFT;
+		} else if (strcasecmp(xval.addr, "TOPRIGHT") == 0) {
+			config.corner = _NET_WM_BOTTOMRIGHT;
+		}
+	}
 }
 
 /* parse command-line options */
@@ -544,8 +611,6 @@ cleanclient(struct Client *cp)
 		XDestroyWindow(dpy, cp->miniwin);
 	if (cp->icon != None)
 		XRenderFreePicture(dpy, cp->icon);
-	if (cp->pix != None)
-		XFreePixmap(dpy, cp->pix);
 	free(cp);
 }
 
@@ -576,28 +641,81 @@ cleandc(void)
 	XFreeGC(dpy, dc.gc);
 }
 
+/* draw client miniwindow borders */
+static void
+drawborder(Window win, int w, int h, int style)
+{
+	XGCValues val;
+	XRectangle *recs;
+	Pixmap pix;
+	int i;
+
+	if (win == None || w <= 0 || h <= 0)
+		return;
+
+	w += config.shadowthickness * 2;
+	h += config.shadowthickness * 2;
+	pix = XCreatePixmap(dpy, win, w, h, depth);
+	recs = ecalloc(config.shadowthickness * 2 + 1, sizeof(*recs));
+
+	/* draw dark shadow */
+	XSetForeground(dpy, dc.gc, dc.windowcolors[style][COLOR_DARK]);
+	XFillRectangle(dpy, pix, dc.gc, 0, 0, w, h);
+
+	/* draw light shadow */
+	for(i = 0; i < config.shadowthickness; i++) {
+		recs[i * 2]     = (XRectangle){
+			.x = w - config.shadowthickness + i,
+			.y = 0,
+			.width = 1,
+			.height = h - (i * 2 + 1),
+		};
+		recs[i * 2 + 1] = (XRectangle){
+			.x = 0,
+			.y = h - config.shadowthickness + i,
+			.width = w - (i * 2 + 1),
+			.height = 1,
+		};
+	}
+	recs[config.shadowthickness * 2] = (XRectangle){
+		.x = w - config.shadowthickness,
+		.y = h - config.shadowthickness,
+		.width = config.shadowthickness,
+		.height = config.shadowthickness,
+	};
+	val.foreground = dc.windowcolors[style][COLOR_LIGHT];
+	XChangeGC(dpy, dc.gc, GCForeground, &val);
+	XFillRectangles(dpy, pix, dc.gc, recs, config.shadowthickness * 2 + 1);
+
+	/* commit pixmap into window borders */
+	XSetWindowBorderPixmap(dpy, win, pix);
+
+	XFreePixmap(dpy, pix);
+	free(recs);
+}
+
 /* redraw client miniwindow */
 static void
 drawclient(struct Client *cp)
 {
 	Picture pic;
+	Pixmap pix;
 	int style;
 
 	if (cp == NULL)
 		return;
 	style = (cp == pager.active) ? STYLE_ACTIVE : STYLE_INACTIVE;
-	XSetWindowBorder(dpy, cp->miniwin, dc.windowcolors[style][COLOR_BORDER]);
-	if (cp->pix != None)
-		XFreePixmap(dpy, cp->pix);
-	cp->pix = XCreatePixmap(dpy, cp->miniwin, cp->w, cp->h, depth);
-	XSetForeground(dpy, dc.gc, dc.windowcolors[style][COLOR_BACKGROUND]);
-	XFillRectangle(dpy, cp->pix, dc.gc, 0, 0, cp->w, cp->h);
+	drawborder(cp->miniwin, cp->w, cp->h, style);
+	pix = XCreatePixmap(dpy, cp->miniwin, cp->w, cp->h, depth);
+	XSetForeground(dpy, dc.gc, dc.windowcolors[style][COLOR_MID]);
+	XFillRectangle(dpy, pix, dc.gc, 0, 0, cp->w, cp->h);
 	if (cp->icon != None) {
-		pic = XRenderCreatePicture(dpy, cp->pix, XRenderFindVisualFormat(dpy, visual), 0, NULL);
+		pic = XRenderCreatePicture(dpy, pix, XRenderFindVisualFormat(dpy, visual), 0, NULL);
 		XRenderComposite(dpy, PictOpOver, cp->icon, None, pic, 0, 0, 0, 0, (cp->w - ICON_SIZE) / 2, (cp->h - ICON_SIZE) / 2, cp->w, cp->h);
 	}
-	XCopyArea(dpy, cp->pix, cp->miniwin, dc.gc, 0, 0, cp->w, cp->h, 0, 0);
-	XSetWindowBackgroundPixmap(dpy, cp->miniwin, cp->pix);
+	XCopyArea(dpy, pix, cp->miniwin, dc.gc, 0, 0, cp->w, cp->h, 0, 0);
+	XSetWindowBackgroundPixmap(dpy, cp->miniwin, pix);
+	XFreePixmap(dpy, pix);
 }
 
 /* set mini-desktops geometry */
@@ -726,8 +844,8 @@ mapclient(struct Client *cp)
 	dp = pager.desktops[cp->desk];
 	cp->x = cp->cx * dp->w / screenw;
 	cp->y = cp->cy * dp->h / screenh;
-	cp->w = max(1, cp->cw * dp->w / screenw - 2 * BORDER_SIZE);     /* 2 for the left and right borders */
-	cp->h = max(1, cp->ch * dp->h / screenh - 2 * BORDER_SIZE);     /* 2 for the top and bottom borders */
+	cp->w = max(1, cp->cw * dp->w / screenw - 2 * config.shadowthickness);
+	cp->h = max(1, cp->ch * dp->h / screenh - 2 * config.shadowthickness);
 	drawclient(cp);
 	XMoveResizeWindow(dpy, cp->miniwin, cp->x, cp->y, cp->w, cp->h);
 	if (!cp->ismapped) {
@@ -881,14 +999,13 @@ setclients(void)
 		if (clients[i] == NULL) {
 			clients[i] = emalloc(sizeof(*clients[i]));
 			*clients[i] = (struct Client) {
-				.pix = None,
 				.ishidden = 0,
 				.ismapped = 0,
 			};
 			clients[i]->clientwin = wins[i];
 			XSelectInput(dpy, clients[i]->clientwin, StructureNotifyMask | PropertyChangeMask);
 			clients[i]->miniwin = XCreateWindow(
-				dpy, pager.win, 0, 0, 1, 1, BORDER_SIZE,
+				dpy, pager.win, 0, 0, 1, 1, config.shadowthickness,
 				CopyFromParent, CopyFromParent, CopyFromParent,
 				CWEventMask, &miniswa
 			);
@@ -1242,6 +1359,10 @@ main(int argc, char *argv[])
 	screenw = DisplayWidth(dpy, screen);
 	screenh = DisplayHeight(dpy, screen);
 	xerrorxlib = XSetErrorHandler(xerror);
+	XrmInitialize();
+	if ((xrm = XResourceManagerString(dpy)) != NULL)
+		xdb = XrmGetStringDatabase(xrm);
+	getresources();
 	getoptions(argc, argv);
 	initatoms();
 	initcolors();
