@@ -47,6 +47,54 @@ DESCRIPTION
      In particular, with window managers which set the
      _NET_CLIENT_LIST_STACKING and _NET_NUMBER_OF_DESKTOPS properties.
 
+RESOURCES
+     paginator understands the following X resources.
+
+     paginator.activeBackground
+          The color of the background of the active window.
+
+     paginator.activeTopShadowColor
+          The color of the top 3D shadow of the active window.
+
+     paginator.activeBottomShadowColor
+          The color of the bottom 3D shadow of the active window.
+
+     paginator.background
+          The color of the background of the desktops.
+
+     paginator.inactiveBackground
+          The color of the background of inactive windows.
+
+     paginator.inactiveTopShadowColor
+          The color of the top 3D shadow of inactive windows.
+
+     paginator.inactiveBottomShadowColor
+          The color of the bottom 3D shadow of inactive windows.
+
+     paginator.orientation
+          The orientation of the desktops on the pager.  Its value must be
+          Horizontal or Vertical.
+
+     paginator.numColumns
+          The number of columns in the pager.
+
+     paginator.numRows
+          The number of rows in the pager.
+
+     paginator.shadowThickness
+          Thickness of the 3D shadow effect, in pixels.
+
+     paginator.selbackground
+          The color of the background of the active desktop.
+
+     paginator.separator
+          The color of the separator between desktops.
+
+     paginator.startingCorner
+          Specify the corner of the pager in which the first desktop should be
+          placed.  The argument for this option must be TopLeft, TopRight,
+          BotomLeft, or BotomRight.
+
 ENVIRONMENT
      The following environment variables affect the execution of paginator
 
