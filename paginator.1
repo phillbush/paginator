@@ -71,6 +71,61 @@ only works in cooperation with EWMH-compliant window managers.
 In particular, with window managers which set the
 _NET_CLIENT_LIST_STACKING and _NET_NUMBER_OF_DESKTOPS
 properties.
+.SH RESOURCES
+.B paginator
+understands the following X resources.
+.TP
+.B paginator.activeBackground
+The color of the background of the active window.
+.TP
+.B paginator.activeTopShadowColor
+The color of the top 3D shadow of the active window.
+.TP
+.B paginator.activeBottomShadowColor
+The color of the bottom 3D shadow of the active window.
+.TP
+.B paginator.background
+The color of the background of the desktops.
+.TP
+.B paginator.inactiveBackground
+The color of the background of inactive windows.
+.TP
+.B paginator.inactiveTopShadowColor
+The color of the top 3D shadow of inactive windows.
+.TP
+.B paginator.inactiveBottomShadowColor
+The color of the bottom 3D shadow of inactive windows.
+.TP
+.B paginator.orientation
+The orientation of the desktops on the pager.
+Its value must be
+.B Horizontal
+or
+.BR Vertical .
+.TP
+.B paginator.numColumns
+The number of columns in the pager.
+.TP
+.B paginator.numRows
+The number of rows in the pager.
+.TP
+.B paginator.shadowThickness
+Thickness of the 3D shadow effect, in pixels.
+.TP
+.B paginator.selbackground
+The color of the background of the active desktop.
+.TP
+.B paginator.separator
+The color of the separator between desktops.
+.TP
+.B paginator.startingCorner
+Specify the corner of the pager in which the first desktop should be placed.
+The argument for this option must be
+.BR TopLeft ,
+.BR TopRight ,
+.BR BotomLeft ,
+or
+.BR BotomRight .
 .SH ENVIRONMENT
 The following environment variables affect the execution of
 .B paginator
