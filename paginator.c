@@ -734,7 +734,6 @@ mapclient(struct Client *cp)
 		XMapWindow(dpy, cp->miniwin);
 		cp->ismapped = 1;
 	}
-	reparentclient(cp);
 }
 
 /* remap all client miniwindows */
@@ -752,6 +751,7 @@ mapclients(void)
 			unmapclient(cp);
 		} else {
 			mapclient(cp);
+			reparentclient(cp);
 		}
 	}
 }
