@@ -894,11 +894,15 @@ mapdrawall(void)
 }
 
 /* set pager size */
-static void
+static int
 setpagersize(int w, int h)
 {
+	int ret;
+
+	ret = (pager.w != w || pager.h != h);
 	pager.w = w;
 	pager.h = h;
+	return ret;
 }
 
 /* update number of desktops */
@@ -1210,15 +1214,14 @@ initpager(int argc, char *argv[])
 	/* set WM protocols */
 	XSetWMProtocols(dpy, pager.win, &atoms[WM_DELETE_WINDOW], 1);
 
-	/* set window attributes */
-	//XSetWindowBackground(dpy, pager.win, dc.desktopbg);
-
 	/* get initial client list */
 	setdeskgeom();
 	drawpager();
 	setcurrdesktop();
 	setclients();
 	setactive();
+	mapdesktops();
+	mapclients();
 
 	/* map window */
 	XMapWindow(dpy, pager.win);
@@ -1279,10 +1282,12 @@ xeventconfigurenotify(XEvent *e)
 		/* screen size changed (eg' a new monitor was plugged-in) */
 		screenw = ev->width;
 		screenh = ev->height;
-	} else if (ev->window == pager.win) {
-		/* the pager window was resized */
-		setpagersize(ev->width, ev->height);
 		mapdrawall();
+	} else if (ev->window == pager.win) {
+		/* the pager window may have been resized */
+		if (setpagersize(ev->width, ev->height)) {
+			mapdrawall();
+		}
 	} else {
 		/* a client window window was resized */
 		mapclient(getclient(ev->window));
