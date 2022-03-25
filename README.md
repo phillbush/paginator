@@ -54,5 +54,3 @@ directory.
 
 * Own a manager selection, as specified by EWMH.
 * Set the `_NET_DESKTOP_LAYOUT` property, as specified by EWMH.
-* Handle client urgency, showing urgent windows in a different color.
-* Support clients in all desktops (`_NET_WM_DESKTOP` equal to `0xFFFFFFFF`).

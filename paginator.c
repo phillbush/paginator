@@ -19,6 +19,7 @@
 #define DEF_NCOLS       2               /* default number of columns */
 #define SEPARATOR_SIZE  1               /* size of the line between minidesktops */
 #define RESIZETIME      64              /* time to redraw containers during resizing */
+#define ALLDESKTOPS     0xFFFFFFFF
 #define PAGER_ACTION    ((long)(1 << 14))
 
 /* colors */
@@ -33,6 +34,7 @@ enum {
 enum {
 	STYLE_ACTIVE,
 	STYLE_INACTIVE,
+	STYLE_URGENT,
 	STYLE_LAST
 };
 
@@ -50,6 +52,8 @@ enum {
 	_NET_WM_ICON,
 	_NET_WM_STATE,
 	_NET_WM_STATE_HIDDEN,
+	_NET_WM_STATE_STICKY,
+	_NET_WM_STATE_DEMANDS_ATTENTION,
 
 	ATOM_LAST,
 };
@@ -86,13 +90,15 @@ struct Desktop {
 /* client info */
 struct Client {
 	Window clientwin;
-	Window miniwin;
+	Window *miniwins;
 	Picture icon;
+	size_t nminiwins;
 	unsigned long desk;
 	int cx, cy, cw, ch;
 	int x, y, w, h;
 	int ishidden;
 	int ismapped;
+	int isurgent;
 };
 
 /* the pager */
@@ -251,6 +257,13 @@ getresources(void)
 		config.windowcolors[STYLE_INACTIVE][COLOR_LIGHT] = xval.addr;
 	if (XrmGetResource(xdb, "paginator.inactiveBottomShadowColor", "*", &type, &xval) == True)
 		config.windowcolors[STYLE_INACTIVE][COLOR_DARK] = xval.addr;
+
+	if (XrmGetResource(xdb, "paginator.urgentBackground", "*", &type, &xval) == True)
+		config.windowcolors[STYLE_URGENT][COLOR_MID] = xval.addr;
+	if (XrmGetResource(xdb, "paginator.urgentTopShadowColor", "*", &type, &xval) == True)
+		config.windowcolors[STYLE_URGENT][COLOR_LIGHT] = xval.addr;
+	if (XrmGetResource(xdb, "paginator.urgentBottomShadowColor", "*", &type, &xval) == True)
+		config.windowcolors[STYLE_URGENT][COLOR_DARK] = xval.addr;
 
 	if (XrmGetResource(xdb, "paginator.background", "*", &type, &xval) == True)
 		config.desktopbg = xval.addr;
@@ -542,9 +555,24 @@ geticonprop(Window win)
 	return pic;
 }
 
+/* check whether window is urgent */
+static int
+isurgent(Window win)
+{
+	XWMHints *wmh;
+	int ret;
+
+	ret = 0;
+	if ((wmh = XGetWMHints(dpy, win)) != NULL) {
+		ret = wmh->flags & XUrgencyHint;
+		XFree(wmh);
+	}
+	return ret;
+}
+
 /* return non-zero if window is hidden */
 static int
-ishidden(Window win)
+hasstate(Window win, Atom atom)
 {
 	Atom *as;
 	unsigned long natoms, i;
@@ -553,7 +581,7 @@ ishidden(Window win)
 	retval = 0;
 	if ((natoms = getatomprop(win, atoms[_NET_WM_STATE], &as)) != 0) {
 		for (i = 0; i < natoms; i++) {
-			if (as[i] == atoms[_NET_WM_STATE_HIDDEN]) {
+			if (as[i] == atom) {
 				retval = 1;
 				break;
 			}
@@ -600,14 +628,27 @@ cleandesktops(void)
 	free(pager.desktops);
 }
 
+/* destroy client's mini-windows */
+static void
+destroyminiwindows(struct Client *cp)
+{
+	size_t i;
+
+	if (cp == NULL)
+		return;
+	for (i = 0; i < cp->nminiwins; i++)
+		if (cp->miniwins[i] != None)
+			XDestroyWindow(dpy, cp->miniwins[i]);
+	free(cp->miniwins);
+}
+
 /* destroy client's mini-windows and free it */
 static void
 cleanclient(struct Client *cp)
 {
 	if (cp == NULL)
 		return;
-	if (cp->miniwin != None)
-		XDestroyWindow(dpy, cp->miniwin);
+	destroyminiwindows(cp);
 	if (cp->icon != None)
 		XRenderFreePicture(dpy, cp->icon);
 	free(cp);
@@ -701,29 +742,47 @@ drawborder(Window win, int w, int h, int style)
 	free(recs);
 }
 
+/* redraw client miniwindow background */
+static void
+drawbackground(Window win, Picture icon, int w, int h, int style)
+{
+	Picture pic;
+	Pixmap pix;
+
+	if (win == None || w <= 0 || h <= 0)
+		return;
+	if ((pix = XCreatePixmap(dpy, win, w, h, depth)) == None)
+		return;
+	XSetForeground(dpy, dc.gc, dc.windowcolors[style][COLOR_MID]);
+	XFillRectangle(dpy, pix, dc.gc, 0, 0, w, h);
+	if (icon != None) {
+		pic = XRenderCreatePicture(dpy, pix, XRenderFindVisualFormat(dpy, visual), 0, NULL);
+		XRenderComposite(dpy, PictOpOver, icon, None, pic, 0, 0, 0, 0, (w - ICON_SIZE) / 2, (h - ICON_SIZE) / 2, w, h);
+	}
+	XCopyArea(dpy, pix, win, dc.gc, 0, 0, w, h, 0, 0);
+	XSetWindowBackgroundPixmap(dpy, win, pix);
+	XFreePixmap(dpy, pix);
+}
+
 /* redraw client miniwindow */
 static void
 drawclient(struct Client *cp)
 {
-	Picture pic;
-	Pixmap pix;
+	size_t i;
 	int style;
 
 	if (cp == NULL)
 		return;
-	style = (cp == pager.active) ? STYLE_ACTIVE : STYLE_INACTIVE;
-	drawborder(cp->miniwin, cp->w, cp->h, style);
-	if ((pix = XCreatePixmap(dpy, cp->miniwin, cp->w, cp->h, depth)) == None)
-		return;
-	XSetForeground(dpy, dc.gc, dc.windowcolors[style][COLOR_MID]);
-	XFillRectangle(dpy, pix, dc.gc, 0, 0, cp->w, cp->h);
-	if (cp->icon != None) {
-		pic = XRenderCreatePicture(dpy, pix, XRenderFindVisualFormat(dpy, visual), 0, NULL);
-		XRenderComposite(dpy, PictOpOver, cp->icon, None, pic, 0, 0, 0, 0, (cp->w - ICON_SIZE) / 2, (cp->h - ICON_SIZE) / 2, cp->w, cp->h);
+	if (cp == pager.active)
+		style = STYLE_ACTIVE;
+	else if (cp->isurgent)
+		style = STYLE_URGENT;
+	else
+		style = STYLE_INACTIVE;
+	for (i = 0; i < cp->nminiwins; i++) {
+		drawborder(cp->miniwins[i], cp->w, cp->h, style);
+		drawbackground(cp->miniwins[i], cp->icon, cp->w, cp->h, style);
 	}
-	XCopyArea(dpy, pix, cp->miniwin, dc.gc, 0, 0, cp->w, cp->h, 0, 0);
-	XSetWindowBackgroundPixmap(dpy, cp->miniwin, pix);
-	XFreePixmap(dpy, pix);
 }
 
 /* set mini-desktops geometry */
@@ -770,22 +829,30 @@ setdeskgeom(void)
 static void
 unmapclient(struct Client *cp)
 {
-	if (cp->ismapped) {
-		XUnmapWindow(dpy, cp->miniwin);
-		cp->ismapped = 0;
-	}
+	size_t i;
+
+	if (cp == NULL || !cp->ismapped)
+		return;
+	for (i = 0; i < cp->nminiwins; i++)
+		XUnmapWindow(dpy, cp->miniwins[i]);
+	cp->ismapped = 0;
 }
 
 /* remap client miniwindow into its desktop miniwindow */
 static void
 reparentclient(struct Client *cp)
 {
-	struct Desktop *dp;
+	size_t i;
 
-	if (cp == NULL || cp->desk < 0 || cp->desk >= pager.ndesktops)
+	if (cp == NULL || cp->desk < 0 || (cp->desk >= pager.ndesktops && cp->desk != ALLDESKTOPS))
 		return;
-	dp = pager.desktops[cp->desk];
-	XReparentWindow(dpy, cp->miniwin, dp->miniwin, cp->x, cp->y);
+	if (cp->desk == ALLDESKTOPS) {
+		for (i = 0; i < cp->nminiwins; i++) {
+			XReparentWindow(dpy, cp->miniwins[i], pager.desktops[i]->miniwin, cp->x, cp->y);
+		}
+	} else if (cp->nminiwins == 1) {
+		XReparentWindow(dpy, cp->miniwins[0], pager.desktops[cp->desk]->miniwin, cp->x, cp->y);
+	}
 }
 
 /* draw pager pixmap */
@@ -833,34 +900,49 @@ mapdesktops(void)
 	}
 }
 
-/* remap single client miniwindow */
+/* set size of client's miniwindow and map client's miniwindow */
 static void
-mapclient(struct Client *cp)
+configureclient(struct Desktop *dp, struct Client *cp, size_t i)
 {
-	struct Desktop *dp;
-	Window dw;
-	unsigned int du, b;
-	int x, y;
-
 	if (cp == NULL)
 		return;
-	if (pager.showingdesk || cp->ishidden || cp->desk < 0 || cp->desk >= pager.ndesktops) {
-		unmapclient(cp);
-		return;
-	}
-	XGetGeometry(dpy, cp->clientwin, &dw, &x, &y, &cp->cw, &cp->ch, &b, &du);
-	XTranslateCoordinates(dpy, cp->clientwin, root, x, y, &cp->cx, &cp->cy, &dw);
-	dp = pager.desktops[cp->desk];
+
 	cp->x = cp->cx * dp->w / screenw;
 	cp->y = cp->cy * dp->h / screenh;
 	cp->w = max(1, cp->cw * dp->w / screenw - 2 * config.shadowthickness);
 	cp->h = max(1, cp->ch * dp->h / screenh - 2 * config.shadowthickness);
 	drawclient(cp);
-	XMoveResizeWindow(dpy, cp->miniwin, cp->x, cp->y, cp->w, cp->h);
-	if (!cp->ismapped) {
-		XMapWindow(dpy, cp->miniwin);
-		cp->ismapped = 1;
+	XMoveResizeWindow(dpy, cp->miniwins[i], cp->x, cp->y, cp->w, cp->h);
+	if (cp->ismapped != cp->nminiwins) {
+		XMapWindow(dpy, cp->miniwins[i]);
 	}
+}
+
+/* get size of client's window and call routine to map client's miniwindow */
+static void
+mapclient(struct Client *cp)
+{
+	Window dw;
+	size_t i;
+	unsigned int du, b;
+	int x, y;
+
+	if (cp == NULL)
+		return;
+	if (pager.showingdesk || cp->ishidden || cp->desk < 0 || (cp->desk >= pager.ndesktops && cp->desk != ALLDESKTOPS)) {
+		unmapclient(cp);
+		return;
+	}
+	XGetGeometry(dpy, cp->clientwin, &dw, &x, &y, &cp->cw, &cp->ch, &b, &du);
+	XTranslateCoordinates(dpy, cp->clientwin, root, x, y, &cp->cx, &cp->cy, &dw);
+	if (cp->desk == ALLDESKTOPS) {
+		for (i = 0; i < cp->nminiwins; i++) {
+			configureclient(pager.desktops[i], cp, i);
+		}
+	} else if (cp->nminiwins == 1) {
+		configureclient(pager.desktops[cp->desk], cp, 0);
+	}
+	cp->ismapped = cp->nminiwins;
 }
 
 /* remap all client miniwindows */
@@ -969,25 +1051,59 @@ sethiddenandmap(struct Client *cp, int remap)
 	if (cp == NULL)
 		return;
 	previshidden = cp->ishidden;
-	cp->ishidden = ishidden(cp->clientwin);
+	cp->ishidden = hasstate(cp->clientwin, atoms[_NET_WM_STATE_HIDDEN]);
 	if (remap && previshidden != cp->ishidden) {
 		mapclient(cp);
 	}
 }
 
-/* set client's desktop number */
+/* set client's urgency */
 static void
-setdesktop(struct Client *cp)
+seturgency(struct Client *cp)
 {
-	unsigned long prevdesk;
+	int prevurgency;
 
 	if (cp == NULL)
 		return;
+	prevurgency = cp->isurgent;
+	cp->isurgent = 0;
+	if (hasstate(cp->clientwin, atoms[_NET_WM_STATE_DEMANDS_ATTENTION]) || isurgent(cp->clientwin))
+		cp->isurgent = 1;
+	if (prevurgency != cp->isurgent) {
+		drawclient(cp);
+	}
+}
+
+/* set client's desktop number; return non-zero if it has changed */
+static int
+setdesktop(struct Client *cp)
+{
+	unsigned long prevdesk;
+	size_t i;
+
+	if (cp == NULL)
+		return 0;
 	prevdesk = cp->desk;
 	cp->desk = getcardprop(cp->clientwin, atoms[_NET_WM_DESKTOP]);
-	if (prevdesk != cp->desk) {
+	if (hasstate(cp->clientwin, atoms[_NET_WM_STATE_STICKY]))
+		cp->desk = ALLDESKTOPS;
+	if (cp->nminiwins == 0 || prevdesk != cp->desk) {
+		if (cp->nminiwins == 0 || prevdesk == ALLDESKTOPS || cp->desk == ALLDESKTOPS) {
+			destroyminiwindows(cp);
+			cp->nminiwins = (cp->desk == ALLDESKTOPS) ? pager.ndesktops : 1;
+			cp->miniwins = ecalloc(cp->nminiwins, sizeof(*cp->miniwins));
+			for (i = 0; i < cp->nminiwins; i++) {
+				cp->miniwins[i] = XCreateWindow(
+					dpy, pager.win, 0, 0, 1, 1, config.shadowthickness,
+					CopyFromParent, CopyFromParent, CopyFromParent,
+					CWEventMask, &miniswa
+				);
+			}
+		}
 		reparentclient(cp);
+		return 1;
 	}
+	return 0;
 }
 
 /* update list of clients; remap mini-client-windows if list has changed */
@@ -1014,18 +1130,18 @@ setclients(void)
 			*clients[i] = (struct Client) {
 				.ishidden = 0,
 				.ismapped = 0,
+				.isurgent = 0,
+				.nminiwins = 0,
+				.miniwins = NULL,
 			};
 			clients[i]->clientwin = wins[i];
 			XSelectInput(dpy, clients[i]->clientwin, StructureNotifyMask | PropertyChangeMask);
-			clients[i]->miniwin = XCreateWindow(
-				dpy, pager.win, 0, 0, 1, 1, config.shadowthickness,
-				CopyFromParent, CopyFromParent, CopyFromParent,
-				CWEventMask, &miniswa
-			);
 			clients[i]->icon = iflag ? geticonprop(clients[i]->clientwin) : None;
 		}
 		sethiddenandmap(clients[i], 0);
-		setdesktop(clients[i]);
+		if (setdesktop(clients[i])) {
+			changed = 1;
+		}
 	}
 	cleanclients();
 	pager.clients = clients;
@@ -1089,18 +1205,20 @@ static void
 initatoms(void)
 {
 	char *atomnames[ATOM_LAST] = {
-		[WM_DELETE_WINDOW]              = "WM_DELETE_WINDOW",
-		[_NET_ACTIVE_WINDOW]            = "_NET_ACTIVE_WINDOW",
-		[_NET_CLIENT_LIST_STACKING]     = "_NET_CLIENT_LIST_STACKING",
-		[_NET_CURRENT_DESKTOP]          = "_NET_CURRENT_DESKTOP",
-		[_NET_WM_DESKTOP]               = "_NET_WM_DESKTOP",
-		[_NET_DESKTOP_LAYOUT]           = "_NET_DESKTOP_LAYOUT",
-		[_NET_SHOWING_DESKTOP]          = "_NET_SHOWING_DESKTOP",
-		[_NET_MOVERESIZE_WINDOW]        = "_NET_MOVERESIZE_WINDOW",
-		[_NET_NUMBER_OF_DESKTOPS]       = "_NET_NUMBER_OF_DESKTOPS",
-		[_NET_WM_ICON]                  = "_NET_WM_ICON",
-		[_NET_WM_STATE]                 = "_NET_WM_STATE",
-		[_NET_WM_STATE_HIDDEN]          = "_NET_WM_STATE_HIDDEN",
+		[WM_DELETE_WINDOW]                = "WM_DELETE_WINDOW",
+		[_NET_ACTIVE_WINDOW]              = "_NET_ACTIVE_WINDOW",
+		[_NET_CLIENT_LIST_STACKING]       = "_NET_CLIENT_LIST_STACKING",
+		[_NET_CURRENT_DESKTOP]            = "_NET_CURRENT_DESKTOP",
+		[_NET_WM_DESKTOP]                 = "_NET_WM_DESKTOP",
+		[_NET_DESKTOP_LAYOUT]             = "_NET_DESKTOP_LAYOUT",
+		[_NET_SHOWING_DESKTOP]            = "_NET_SHOWING_DESKTOP",
+		[_NET_MOVERESIZE_WINDOW]          = "_NET_MOVERESIZE_WINDOW",
+		[_NET_NUMBER_OF_DESKTOPS]         = "_NET_NUMBER_OF_DESKTOPS",
+		[_NET_WM_ICON]                    = "_NET_WM_ICON",
+		[_NET_WM_STATE]                   = "_NET_WM_STATE",
+		[_NET_WM_STATE_HIDDEN]            = "_NET_WM_STATE_HIDDEN",
+		[_NET_WM_STATE_STICKY]            = "_NET_WM_STATE_STICKY",
+		[_NET_WM_STATE_DEMANDS_ATTENTION] = "_NET_WM_STATE_DEMANDS_ATTENTION",
 	};
 
 	XInternAtoms(dpy, atomnames, ATOM_LAST, False, atoms);
@@ -1231,7 +1349,7 @@ initpager(int argc, char *argv[])
 static void
 focus(Window win)
 {
-	size_t i;
+	size_t i, j;
 
 	for (i = 0; i < pager.ndesktops; i++) {
 		if (win == pager.desktops[i]->miniwin) {
@@ -1240,9 +1358,13 @@ focus(Window win)
 		}
 	}
 	for (i = 0; i < pager.nclients; i++) {
-		if (pager.clients[i] != NULL && win == pager.clients[i]->miniwin) {
-			clientmsg(pager.clients[i]->clientwin, atoms[_NET_ACTIVE_WINDOW], 2, CurrentTime, 0, 0, 0);
-			return;
+		if (pager.clients[i] == NULL)
+			continue;
+		for (j = 0; j < pager.clients[i]->nminiwins; j++) {
+			if (win == pager.clients[i]->miniwins[j]) {
+				clientmsg(pager.clients[i]->clientwin, atoms[_NET_ACTIVE_WINDOW], 2, CurrentTime, 0, 0, 0);
+				return;
+			}
 		}
 	}
 }
@@ -1283,12 +1405,12 @@ xeventconfigurenotify(XEvent *e)
 		screenw = ev->width;
 		screenh = ev->height;
 		mapdrawall();
-	} else if (ev->window == pager.win) {
-		/* the pager window may have been resized */
-		if (setpagersize(ev->width, ev->height)) {
+	} else {
+		if (ev->window == pager.win && setpagersize(ev->width, ev->height)) {
+			/* the pager window may have been resized */
 			mapdrawall();
 		}
-	} else {
+
 		/* a client window window was resized */
 		mapclient(getclient(ev->window));
 	}
@@ -1298,6 +1420,7 @@ xeventconfigurenotify(XEvent *e)
 static void
 xeventpropertynotify(XEvent *e)
 {
+	struct Client *cp;
 	XPropertyEvent *ev;
 
 	/*
@@ -1330,11 +1453,21 @@ xeventpropertynotify(XEvent *e)
 		/* the number of desktops value was reset */
 		setndesktops();
 	} else if (ev->atom == atoms[_NET_WM_STATE]) {
-		/* the list of states of a window (which may or may not include its hidden state) was reset */
-		sethiddenandmap(getclient(ev->window), 1);
+		/* the list of states of a window (which may or may not include a relevant state) was reset */
+		cp = getclient(ev->window);
+		sethiddenandmap(cp, 1);
+		setdesktop(cp);
+		seturgency(cp);
+		mapclient(cp);
 	} else if (ev->atom == atoms[_NET_WM_DESKTOP]) {
 		/* the desktop of a window was reset */
-		setdesktop(getclient(ev->window));
+		cp = getclient(ev->window);
+		setdesktop(cp);
+		mapclient(cp);
+	} else if (ev->atom == XA_WM_HINTS) {
+		/* the urgency state of a window was reset */
+		cp = getclient(ev->window);
+		seturgency(cp);
 	}
 }
 

@@ -16,6 +16,7 @@ struct Config config = {
 	.windowcolors = {
 		[STYLE_ACTIVE]   = {"#3465A4", "#729FCF", "#204A87"},
 		[STYLE_INACTIVE] = {"#555753", "#888A85", "#2E3436"},
+		[STYLE_URGENT]   = {"#CC0000", "#EF2929", "#A40000"},
 	},
 	.desktopselbg    = "#BABDB6",
 	.desktopbg       = "#121212",
