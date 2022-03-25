@@ -101,7 +101,6 @@ struct Pager {
 	struct Client **clients;
 	struct Client *active;
 	Window win;
-	Pixmap pix;
 	size_t nclients;
 	unsigned long ndesktops;
 	unsigned long currdesktop;
@@ -143,7 +142,7 @@ static char *xrm = NULL;
 
 /* window attributes for miniwindows */
 static XSetWindowAttributes miniswa = {
-	.event_mask = ExposureMask | ButtonPressMask | ButtonReleaseMask
+	.event_mask = ButtonPressMask | ButtonReleaseMask
 };
 
 /* whether we're running */
@@ -158,7 +157,6 @@ static struct Pager pager = {
 	.desktops = NULL,
 	.clients = NULL,
 	.active = NULL,
-	.pix = None,
 	.win = None,
 	.nclients = 0,
 	.ndesktops = 0,
@@ -222,6 +220,7 @@ static int
 xerror(Display *dpy, XErrorEvent *e)
 {
 	if (e->error_code == BadWindow || e->error_code == BadDrawable ||
+	    (e->request_code == X_FreePixmap && e->error_code == BadPixmap) ||
 	    (e->request_code == X_ConfigureWindow && e->error_code == BadMatch) ||
 	    (e->request_code == X_ConfigureWindow && e->error_code == BadValue))
 		return 0;
@@ -627,6 +626,13 @@ cleanclients(void)
 	free(pager.clients);
 }
 
+/* free pager window and pixmap */
+static void
+cleanpager(void)
+{
+	XDestroyWindow(dpy, pager.win);
+}
+
 /* destroy drawing context */
 static void
 cleandc(void)
@@ -655,7 +661,8 @@ drawborder(Window win, int w, int h, int style)
 
 	w += config.shadowthickness * 2;
 	h += config.shadowthickness * 2;
-	pix = XCreatePixmap(dpy, win, w, h, depth);
+	if ((pix = XCreatePixmap(dpy, win, w, h, depth)) == None)
+		return;
 	recs = ecalloc(config.shadowthickness * 2 + 1, sizeof(*recs));
 
 	/* draw dark shadow */
@@ -706,7 +713,8 @@ drawclient(struct Client *cp)
 		return;
 	style = (cp == pager.active) ? STYLE_ACTIVE : STYLE_INACTIVE;
 	drawborder(cp->miniwin, cp->w, cp->h, style);
-	pix = XCreatePixmap(dpy, cp->miniwin, cp->w, cp->h, depth);
+	if ((pix = XCreatePixmap(dpy, cp->miniwin, cp->w, cp->h, depth)) == None)
+		return;
 	XSetForeground(dpy, dc.gc, dc.windowcolors[style][COLOR_MID]);
 	XFillRectangle(dpy, pix, dc.gc, 0, 0, cp->w, cp->h);
 	if (cp->icon != None) {
@@ -784,28 +792,29 @@ reparentclient(struct Client *cp)
 static void
 drawpager(void)
 {
+	Pixmap pix;
 	int x, y;
 	int w, h;
 	int i;
 
-	/* draw pager */
-	if (pager.pix != None)
-		XFreePixmap(dpy, pager.pix);
-	pager.pix = XCreatePixmap(dpy, pager.win, pager.w, pager.h, depth);
+	if ((pix = XCreatePixmap(dpy, pager.win, pager.w, pager.h, depth)) == None)
+		return;
 	XSetForeground(dpy, dc.gc, dc.desktopbg);
-	XFillRectangle(dpy, pager.pix, dc.gc, 0, 0, pager.w, pager.h);
+	XFillRectangle(dpy, pix, dc.gc, 0, 0, pager.w, pager.h);
 	XSetForeground(dpy, dc.gc, dc.separator);
 	w = pager.w - config.ncols;
 	h = pager.h - config.nrows;
 	for (i = 1; i < config.ncols; i++) {
 		x = w * i / config.ncols + i - 1;
-		XDrawLine(dpy, pager.pix, dc.gc, x, 0, x, pager.h);
+		XDrawLine(dpy, pix, dc.gc, x, 0, x, pager.h);
 	}
 	for (i = 1; i < config.nrows; i++) {
 		y = h * i / config.nrows + i - 1;
-		XDrawLine(dpy, pager.pix, dc.gc, 0, y, pager.w, y);
+		XDrawLine(dpy, pix, dc.gc, 0, y, pager.w, y);
 	}
-	XCopyArea(dpy, pager.pix, pager.win, dc.gc, 0, 0, pager.w, pager.h, 0, 0);
+	XCopyArea(dpy, pix, pager.win, dc.gc, 0, 0, pager.w, pager.h, 0, 0);
+	XSetWindowBackgroundPixmap(dpy, pager.win, pix);
+	XFreePixmap(dpy, pix);
 }
 
 /* map desktop miniwindows */
@@ -1132,7 +1141,7 @@ initpager(int argc, char *argv[])
 		CopyFromParent, CopyFromParent, CopyFromParent,
 		CWEventMask | CWBackPixel,
 		&(XSetWindowAttributes){
-			.event_mask = ExposureMask | StructureNotifyMask,
+			.event_mask = StructureNotifyMask,
 			.background_pixel = dc.desktopbg,
 		}
 	);
@@ -1324,25 +1333,12 @@ xeventpropertynotify(XEvent *e)
 	}
 }
 
-/* redraw the pager window when exposed */
-static void
-xeventexpose(XEvent *e)
-{
-	XExposeEvent *ev;
-
-	ev = &e->xexpose;
-	if (ev->window == pager.win) {
-		XCopyArea(dpy, pager.pix, pager.win, dc.gc, 0, 0, pager.w, pager.h, 0, 0);
-	}
-}
-
 /* paginator: a X11 desktop pager */
 int
 main(int argc, char *argv[])
 {
 	XEvent ev;
 	void (*xevents[LASTEvent])(XEvent *) = {
-		[Expose]                = xeventexpose,
 		[ButtonRelease]         = xeventbuttonrelease,
 		[ConfigureNotify]       = xeventconfigurenotify,
 		[ClientMessage]         = xeventclientmessage,
@@ -1373,6 +1369,7 @@ main(int argc, char *argv[])
 			(*xevents[ev.type])(&ev);
 	cleandesktops();
 	cleanclients();
+	cleanpager();
 	cleandc();
 	XCloseDisplay(dpy);
 	return 0;
