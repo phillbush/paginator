@@ -636,9 +636,12 @@ destroyminiwindows(struct Client *cp)
 
 	if (cp == NULL)
 		return;
-	for (i = 0; i < cp->nminiwins; i++)
-		if (cp->miniwins[i] != None)
+	for (i = 0; i < cp->nminiwins; i++) {
+		if (cp->miniwins[i] != None) {
 			XDestroyWindow(dpy, cp->miniwins[i]);
+			cp->miniwins[i] = None;
+		}
+	}
 	free(cp->miniwins);
 }
 
@@ -996,6 +999,7 @@ setndesktops(void)
 
 	prevndesktops = pager.ndesktops;
 	cleandesktops();
+	cleanclients();
 	pager.ndesktops = getcardprop(root, atoms[_NET_NUMBER_OF_DESKTOPS]);
 	pager.desktops = ecalloc(pager.ndesktops, sizeof(*pager.desktops));
 	if (pager.ndesktops < 1 || pager.ndesktops > MAX_DESKTOPS)
@@ -1452,6 +1456,7 @@ xeventpropertynotify(XEvent *e)
 	} else if (ev->atom == atoms[_NET_NUMBER_OF_DESKTOPS]) {
 		/* the number of desktops value was reset */
 		setndesktops();
+		setclients();
 	} else if (ev->atom == atoms[_NET_WM_STATE]) {
 		/* the list of states of a window (which may or may not include a relevant state) was reset */
 		cp = getclient(ev->window);
