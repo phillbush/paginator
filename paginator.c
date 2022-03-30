@@ -18,7 +18,6 @@
 #define DEF_WIDTH       125             /* default width for the pager */
 #define DEF_NCOLS       2               /* default number of columns */
 #define SEPARATOR_SIZE  1               /* size of the line between minidesktops */
-#define RESIZETIME      64              /* time to redraw containers during resizing */
 #define ALLDESKTOPS     0xFFFFFFFF
 #define PAGER_ACTION    ((long)(1 << 14))
 
@@ -93,6 +92,7 @@ struct Client {
 	Window *miniwins;
 	Picture icon;
 	size_t nminiwins;
+	size_t nmappedwins;
 	unsigned long desk;
 	int cx, cy, cw, ch;
 	int x, y, w, h;
@@ -916,7 +916,7 @@ configureclient(struct Desktop *dp, struct Client *cp, size_t i)
 	cp->h = max(1, cp->ch * dp->h / screenh - 2 * config.shadowthickness);
 	drawclient(cp);
 	XMoveResizeWindow(dpy, cp->miniwins[i], cp->x, cp->y, cp->w, cp->h);
-	if (cp->ismapped != cp->nminiwins) {
+	if (cp->ismapped || cp->nmappedwins != cp->nminiwins) {
 		XMapWindow(dpy, cp->miniwins[i]);
 	}
 }
@@ -945,7 +945,8 @@ mapclient(struct Client *cp)
 	} else if (cp->nminiwins == 1) {
 		configureclient(pager.desktops[cp->desk], cp, 0);
 	}
-	cp->ismapped = cp->nminiwins;
+	cp->nmappedwins = cp->nminiwins;
+	cp->ismapped = 1;
 }
 
 /* remap all client miniwindows */
@@ -1136,6 +1137,7 @@ setclients(void)
 				.ismapped = 0,
 				.isurgent = 0,
 				.nminiwins = 0,
+				.nmappedwins = 0,
 				.miniwins = NULL,
 			};
 			clients[i]->clientwin = wins[i];
@@ -1253,7 +1255,7 @@ initroot(void)
 	);
 }
 
-/* compute prompt geometry and create prompt window */
+/* create prompt window */
 static void
 initpager(int argc, char *argv[])
 {
@@ -1272,6 +1274,43 @@ initpager(int argc, char *argv[])
 		}
 	);
 
+	/* create graphic contexts */
+	dc.gc = XCreateGC(dpy, pager.win, GCFillStyle | GCLineStyle,
+		&(XGCValues){
+			.fill_style = FillSolid,
+			.line_style = LineOnOffDash,
+		}
+	);
+
+	/* set window hints */
+	wmhints = NULL;
+	if ((chint = XAllocClassHint()) == NULL)
+		errx(1, "XAllocClassHint");
+	chint->res_name = *argv;
+	chint->res_class = PROGNAME;
+	if ((shints = XAllocSizeHints()) == NULL)
+		errx(1, "XAllocSizeHints");
+	shints->flags = (config.userplaced) ? USPosition : 0;
+	if (wflag) {
+		if ((wmhints = XAllocWMHints()) == NULL)
+			errx(1, "XAllocWMHints");
+		wmhints->flags = IconWindowHint | StateHint;
+		wmhints->initial_state = WithdrawnState;
+		wmhints->icon_window = pager.win;
+	}
+	XmbSetWMProperties(dpy, pager.win, PROGNAME, PROGNAME, argv, argc, shints, wmhints, chint);
+	XFree(chint);
+	XFree(shints);
+	XFree(wmhints);
+
+	/* set WM protocols */
+	XSetWMProtocols(dpy, pager.win, &atoms[WM_DELETE_WINDOW], 1);
+}
+
+/* set initial list of desktops and clients */
+static void
+initclients(void)
+{
 	/* get initial number of desktops */
 	setndesktops();
 
@@ -1299,42 +1338,6 @@ initpager(int argc, char *argv[])
 
 	/* commit pager window geometry */
 	XMoveResizeWindow(dpy, pager.win, config.x, config.y, pager.w, pager.h);
-
-	/* create graphic contexts */
-	dc.gc = XCreateGC(dpy, pager.win, GCFillStyle | GCLineStyle,
-		&(XGCValues){
-			.fill_style = FillSolid,
-			.line_style = LineOnOffDash,
-		}
-	);
-
-	/* set window hints */
-	wmhints = NULL;
-	if ((chint = XAllocClassHint()) == NULL)
-		errx(1, "XAllocClassHint");
-	chint->res_name = *argv;
-	chint->res_class = PROGNAME;
-	if ((shints = XAllocSizeHints()) == NULL)
-		errx(1, "XAllocSizeHints");
-	shints->flags = PMaxSize | PMinSize;
-	if (config.userplaced)
-		shints->flags |= USPosition;
-	shints->min_width = shints->max_width = pager.w;
-	shints->min_height = shints->max_height = pager.h;
-	if (wflag) {
-		if ((wmhints = XAllocWMHints()) == NULL)
-			errx(1, "XAllocWMHints");
-		wmhints->flags = IconWindowHint | StateHint;
-		wmhints->initial_state = WithdrawnState;
-		wmhints->icon_window = pager.win;
-	}
-	XmbSetWMProperties(dpy, pager.win, PROGNAME, PROGNAME, argv, argc, shints, wmhints, chint);
-	XFree(chint);
-	XFree(shints);
-	XFree(wmhints);
-
-	/* set WM protocols */
-	XSetWMProtocols(dpy, pager.win, &atoms[WM_DELETE_WINDOW], 1);
 
 	/* get initial client list */
 	setdeskgeom();
@@ -1507,6 +1510,7 @@ main(int argc, char *argv[])
 	initcolors();
 	initroot();
 	initpager(argc, argv);
+	initclients();
 	while (running && !XNextEvent(dpy, &ev))
 		if (xevents[ev.type] != NULL)
 			(*xevents[ev.type])(&ev);
