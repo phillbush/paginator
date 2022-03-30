@@ -16,7 +16,7 @@
 #define ICON_SIZE       16              /* preferred icon size */
 #define MAX_DESKTOPS    100             /* maximum number of desktops */
 #define DEF_WIDTH       125             /* default width for the pager */
-#define DEF_NCOLS       2               /* default number of columns */
+#define DEF_NCOLS       1               /* default number of columns */
 #define SEPARATOR_SIZE  1               /* size of the line between minidesktops */
 #define ALLDESKTOPS     0xFFFFFFFF
 #define PAGER_ACTION    ((long)(1 << 14))
@@ -110,6 +110,7 @@ struct Pager {
 	size_t nclients;
 	unsigned long ndesktops;
 	unsigned long currdesktop;
+	int nrows, ncols;
 	int cellw, cellh;
 	int w, h;
 	int showingdesk;
@@ -626,6 +627,7 @@ cleandesktops(void)
 		free(pager.desktops[i]);
 	}
 	free(pager.desktops);
+	pager.desktops = NULL;
 }
 
 /* destroy client's mini-windows */
@@ -668,6 +670,7 @@ cleanclients(void)
 		pager.clients[i] = NULL;
 	}
 	free(pager.clients);
+	pager.clients = NULL;
 }
 
 /* free pager window and pixmap */
@@ -795,31 +798,31 @@ setdeskgeom(void)
 	int x, y, w, h;
 	size_t i, xi, yi;
 
-	w = pager.w - config.ncols;
-	h = pager.h - config.nrows;
+	w = max(1, pager.w - pager.ncols);
+	h = max(1, pager.h - pager.nrows);
 	for (i = 0; i < pager.ndesktops; i++) {
 		xi = yi = i;
 		if (config.orient == _NET_WM_ORIENTATION_HORZ)
-			yi /= config.ncols;
+			yi /= pager.ncols;
 		else
-			xi /= config.nrows;
+			xi /= pager.nrows;
 		if (config.corner == _NET_WM_TOPRIGHT) {
-			x = config.ncols - 1 - xi % config.ncols;
-			y = yi % config.nrows;
+			x = pager.ncols - 1 - xi % pager.ncols;
+			y = yi % pager.nrows;
 		} else if (config.corner == _NET_WM_BOTTOMLEFT) {
-			x = xi % config.ncols;
-			y = config.nrows - 1 - yi % config.nrows;
+			x = xi % pager.ncols;
+			y = pager.nrows - 1 - yi % pager.nrows;
 		} else if (config.corner == _NET_WM_BOTTOMRIGHT) {
-			x = config.ncols - 1 - xi % config.ncols;
-			y = config.nrows - 1 - yi % config.nrows;
+			x = pager.ncols - 1 - xi % pager.ncols;
+			y = pager.nrows - 1 - yi % pager.nrows;
 		} else {
-			x = xi % config.ncols;
-			y = yi % config.nrows;
+			x = xi % pager.ncols;
+			y = yi % pager.nrows;
 		}
-		pager.desktops[i]->x = w * x / config.ncols + x;
-		pager.desktops[i]->y = h * y / config.nrows + y;
-		pager.desktops[i]->w = max(1, w * (x + 1) / config.ncols - w * x / config.ncols);
-		pager.desktops[i]->h = max(1, h * (y + 1) / config.nrows - h * y / config.nrows);
+		pager.desktops[i]->x = w * x / pager.ncols + x;
+		pager.desktops[i]->y = h * y / pager.nrows + y;
+		pager.desktops[i]->w = max(1, w * (x + 1) / pager.ncols - w * x / pager.ncols);
+		pager.desktops[i]->h = max(1, h * (y + 1) / pager.nrows - h * y / pager.nrows);
 		XMoveResizeWindow(
 			dpy, pager.desktops[i]->miniwin,
 			pager.desktops[i]->x, pager.desktops[i]->y,
@@ -867,19 +870,20 @@ drawpager(void)
 	int w, h;
 	int i;
 
-	if ((pix = XCreatePixmap(dpy, pager.win, pager.w, pager.h, depth)) == None)
+	if (pager.w == 0 || pager.h == 0 ||
+	    (pix = XCreatePixmap(dpy, pager.win, pager.w, pager.h, depth)) == None)
 		return;
 	XSetForeground(dpy, dc.gc, dc.desktopbg);
 	XFillRectangle(dpy, pix, dc.gc, 0, 0, pager.w, pager.h);
 	XSetForeground(dpy, dc.gc, dc.separator);
-	w = pager.w - config.ncols;
-	h = pager.h - config.nrows;
-	for (i = 1; i < config.ncols; i++) {
-		x = w * i / config.ncols + i - 1;
+	w = pager.w - pager.ncols;
+	h = pager.h - pager.nrows;
+	for (i = 1; i < pager.ncols; i++) {
+		x = w * i / pager.ncols + i - 1;
 		XDrawLine(dpy, pix, dc.gc, x, 0, x, pager.h);
 	}
-	for (i = 1; i < config.nrows; i++) {
-		y = h * i / config.nrows + i - 1;
+	for (i = 1; i < pager.nrows; i++) {
+		y = h * i / pager.nrows + i - 1;
 		XDrawLine(dpy, pix, dc.gc, 0, y, pager.w, y);
 	}
 	XCopyArea(dpy, pix, pager.win, dc.gc, 0, 0, pager.w, pager.h, 0, 0);
@@ -1002,9 +1006,11 @@ setndesktops(void)
 	cleandesktops();
 	cleanclients();
 	pager.ndesktops = getcardprop(root, atoms[_NET_NUMBER_OF_DESKTOPS]);
+	pager.nrows = max(1, config.nrows);
+	pager.ncols = max(1, config.ncols);
+	pager.nrows = max(1, (pager.ndesktops + (pager.ndesktops % pager.ncols)) / pager.ncols);
+	pager.ncols = max(1, (pager.ndesktops + (pager.ndesktops % pager.nrows)) / pager.nrows);
 	pager.desktops = ecalloc(pager.ndesktops, sizeof(*pager.desktops));
-	if (pager.ndesktops < 1 || pager.ndesktops > MAX_DESKTOPS)
-		errx(1, "could not get number of desktops");
 	for (i = 0; i < pager.ndesktops; i++) {
 		pager.desktops[i] = emalloc(sizeof(*pager.desktops[i]));
 		pager.desktops[i]->miniwin = XCreateWindow(
@@ -1013,7 +1019,7 @@ setndesktops(void)
 			CWEventMask, &miniswa
 		);
 	}
-	if (prevndesktops > 0 && prevndesktops != pager.ndesktops) {
+	if (prevndesktops == 0 || prevndesktops != pager.ndesktops) {
 		mapdrawall();
 	}
 }
@@ -1179,9 +1185,6 @@ setcurrdesktop(void)
 
 	prevdesktop = pager.currdesktop;
 	pager.currdesktop = getcardprop(root, atoms[_NET_CURRENT_DESKTOP]);
-	if (pager.currdesktop < 0) {
-		errx(1, "could not get current desktop");
-	}
 	if (prevdesktop != pager.currdesktop) {
 		mapdesktops();
 	}
@@ -1314,21 +1317,13 @@ initclients(void)
 	/* get initial number of desktops */
 	setndesktops();
 
-	/* compute pager layout */
-	if (config.ncols <= 0 && config.nrows <= 0)
-		config.ncols = DEF_NCOLS;
-	if (config.ncols > 0 && config.nrows <= 0)
-		config.nrows = (pager.ndesktops + (pager.ndesktops % config.ncols)) / config.ncols;
-	if (config.ncols <= 0 && config.nrows > 0)
-		config.ncols = (pager.ndesktops + (pager.ndesktops % config.nrows)) / config.nrows;
-
-	/* compute pager size */
+	/* compute initial pager size */
 	if (pager.w <= 0 && pager.h <= 0)
 		pager.w = DEF_WIDTH;
 	if (pager.w > 0 && pager.h <= 0)
-		pager.h = (SEPARATOR_SIZE * config.nrows) + (config.nrows * (pager.w - (SEPARATOR_SIZE * config.ncols)) * screenh) / (config.ncols * screenw);
+		pager.h = (SEPARATOR_SIZE * pager.nrows) + (pager.nrows * (pager.w - (SEPARATOR_SIZE * pager.ncols)) * screenh) / (pager.ncols * screenw);
 	if (pager.w <= 0 && pager.h > 0)
-		pager.w = (SEPARATOR_SIZE * config.ncols) + (config.ncols * (pager.h - (SEPARATOR_SIZE * config.nrows)) * screenw) / (config.nrows * screenh);
+		pager.w = (SEPARATOR_SIZE * pager.ncols) + (pager.ncols * (pager.h - (SEPARATOR_SIZE * pager.nrows)) * screenw) / (pager.nrows * screenh);
 
 	/* compute user-defined pager position */
 	if (config.xnegative)
