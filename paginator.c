@@ -770,7 +770,7 @@ focus(Window win, unsigned int button)
 {
 	size_t i, j;
 
-	if (ev->button != Button1 && ev->button != Button3)
+	if (button != Button1 && button != Button3)
 		return;
 	for (i = 0; i < pager.ndesktops; i++) {
 		if (win == pager.desktops[i]->miniwin) {
@@ -783,7 +783,7 @@ focus(Window win, unsigned int button)
 			continue;
 		for (j = 0; j < pager.clients[i]->nminiwins; j++) {
 			if (win == pager.clients[i]->miniwins[j]) {
-				if (ev->button == Button1)
+				if (button == Button1)
 					clientmsg(pager.clients[i]->clientwin, atoms[_NET_ACTIVE_WINDOW], 2, CurrentTime, 0, 0, 0);
 				else
 					clientmsg(None, atoms[_NET_CURRENT_DESKTOP], i, CurrentTime, 0, 0, 0);
