@@ -1,138 +1,124 @@
-.TH PAGINATOR 1
-.SH NAME
-paginator \- X11 desktop pager
-.SH SYNOPSIS
-.B paginator
-.RB [ \-iw ]
-.RB [ \-c
-.IR corner ]
-.RB [ \-g
-.IR geometry ]
-.RB [ \-l
-.IR layout ]
-.RB [ \-o
-.IR orientation ]
-.SH DESCRIPTION
-.B paginator
-is a desktop pager for X11 that provides to the user a GUI interface
-to change the current desktop or the current window with mouse's button 1.
-.PP
+.Dd September 21, 2022
+.Dt PAGINATOR 1
+.Os
+.Sh NAME
+.Nm paginator
+.Nd X11 desktop pager
+.Sh SYNOPSIS
+.Nm
+.Op Fl iw
+.Op Fl c Ar corner
+.Op Fl g Ar geometry
+.Op Fl l Ar layout
+.Op Fl o Ar orientation
+.Sh DESCRIPTION
+.Nm
+is a desktop pager for X11 that provides to the user a graphical interface
+to change the current desktop or the current window.
+.Pp
 The options are as follows:
-.TP
-\fB\-c\fP \fIcorner\fP
+.Bl -tag -width Ds
+.It Fl c Ar corner
 Specify the corner of the pager in which the first desktop should be placed.
 The argument for this option must be
-.BR TL ,
-.BR TR ,
-.BR BL ,
+.Cm TL ,
+.Cm TR ,
+.Cm BL ,
 or
-.B BR
+.Cm BR
 (top-left, top-right, bottom-left, or bottom-right, respectively).
 If not provided, the starting corner will be top-left.
-.TP
-\fB\-g\fP \fIgeometry\fP
+.It Fl g Ar geometry
 Specify a size for the pager window.
 The argument for this option must be a geometry specification recognized by
-.IR XParseGeometry (1)
+.Xr XParseGeometry 1
 If not provided, the window size will be computed from
 the pager layout, the number of desktops and the size of the screen.
-.TP
-.B \-i
+.It Fl i
 Draw window icons on the pager.
-.TP
-\fB\-l\fP \fIlayout\fP
+.It Fl l Ar layout
 Specify the layout of the pager.
-The argument for this option must be in the format \fINCOLS\fPx\fINROWS\fP,
+The argument for this option must be in the format
+.Ar NCOLSPxNROWS ,
 where
-.I NCOLS
+.Ar NCOLS
 is the number of columns in the pager, and
-.I NROWS
+.Ar NROWS
 is the number of rows in the pager.
 If not specified, the number of columns will be 2,
 and the number of rows will be computed from the number of desktops.
-.TP
-\fB\-o\fP \fIorientation\fP
+.It Fl o Ar orientation
 Specify the orientation of the desktops on the pager.
 The argument for this option must be
-.BR H ,
+.Cm H ,
 or
-.B V
+.Cm V
 (horizontal or vertical, respectively).
 If not provided, the starting corner will be horizontal.
-.TP
-.B \-w
+.It Fl w
 Start in the withdrawn mode.
 This makes
-.B paginator
+.Nm
 work like a dockapp.
-.PP
-.B Paginator
+.El
+.Pp
+.Nm
 only works in cooperation with EWMH-compliant window managers.
 In particular, with window managers which set the
 _NET_CLIENT_LIST_STACKING and _NET_NUMBER_OF_DESKTOPS
 properties.
-.SH RESOURCES
-.B paginator
+.Sh RESOURCES
+.Nm
 understands the following X resources.
-.TP
-.B paginator.activeBackground
+.Bl -tag -width Ds
+.It Ic "paginator.activeBackground"
 The color of the background of the active window.
-.TP
-.B paginator.activeTopShadowColor
+.It Ic "paginator.activeTopShadowColor"
 The color of the top 3D shadow of the active window.
-.TP
-.B paginator.activeBottomShadowColor
+.It Ic "paginator.activeBottomShadowColor"
 The color of the bottom 3D shadow of the active window.
-.TP
-.B paginator.background
+.It Ic "paginator.background"
 The color of the background of the desktops.
-.TP
-.B paginator.inactiveBackground
+.It Ic "paginator.inactiveBackground"
 The color of the background of inactive windows.
-.TP
-.B paginator.inactiveTopShadowColor
+.It Ic "paginator.inactiveTopShadowColor"
 The color of the top 3D shadow of inactive windows.
-.TP
-.B paginator.inactiveBottomShadowColor
+.It Ic "paginator.inactiveBottomShadowColor"
 The color of the bottom 3D shadow of inactive windows.
-.TP
-.B paginator.orientation
+.It Ic "paginator.orientation"
 The orientation of the desktops on the pager.
 Its value must be
-.B Horizontal
+.Cm Horizontal
 or
-.BR Vertical .
-.TP
-.B paginator.numColumns
+.Cm Vertical .
+.It Ic "paginator.numColumns"
 The number of columns in the pager.
-.TP
-.B paginator.numRows
+.It Ic "paginator.numRows"
 The number of rows in the pager.
-.TP
-.B paginator.shadowThickness
+.It Ic "paginator.shadowThickness"
 Thickness of the 3D shadow effect, in pixels.
-.TP
-.B paginator.selbackground
+.It Ic "paginator.selbackground"
 The color of the background of the active desktop.
-.TP
-.B paginator.separator
+.It Ic "paginator.separator"
 The color of the separator between desktops.
-.TP
-.B paginator.startingCorner
+.It Ic "paginator.startingCorner"
 Specify the corner of the pager in which the first desktop should be placed.
 The argument for this option must be
-.BR TopLeft ,
-.BR TopRight ,
-.BR BotomLeft ,
+.Cm TopLeft ,
+.Cm TopRight ,
+.Cm BotomLeft ,
 or
-.BR BotomRight .
-.SH ENVIRONMENT
+.Cm BotomRight .
+.El
+.Sh ENVIRONMENT
 The following environment variables affect the execution of
-.B paginator
-.TP
-.B DISPLAY
+.Nm
+.Bl -tag -width Ds
+.It DISPLAY
 The display to start
-.B paginator
+.Nm
 on.
-.SH SEE ALSO
-.IR X (1)
+.El
+.Sh SEE ALSO
+.Xr taskinator (1) ,
+.Xr X (1)
