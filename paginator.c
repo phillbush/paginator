@@ -412,8 +412,11 @@ mapdesktops(void)
 	size_t i;
 
 	for (i = 0; i < pager.ndesktops; i++) {
-		setbg(pager.desktops[i]->miniwin, (i == pager.currdesktop));
-		mapwin(pager.desktops[i]->miniwin);
+		setbg(pager.desktops[i]->miniwin,
+			pager.desktops[i]->w,
+			pager.desktops[i]->h,
+			(i == pager.currdesktop)
+		);
 	}
 }
 

@@ -573,9 +573,15 @@ preparewin(Window win)
 }
 
 void
-setbg(Window win, int select)
+setbg(Window win, int w, int h, int select)
 {
-	XSetWindowBackground(dpy, win, select ? dc.selbackground : dc.background);
+	unsigned long color;
+
+	color = select ? dc.selbackground : dc.background;
+	XSetWindowBackground(dpy, win, color);
+	XSetForeground(dpy, dc.gc, color);
+	XFillRectangle(dpy, win, dc.gc, 0, 0, w, h);
+	mapwin(win);
 }
 
 void

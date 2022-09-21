@@ -77,7 +77,7 @@ void freepicture(XID pic);
 void preparewin(Window win);
 void getgeometry(Window win, int *cx, int *cy, int *cw, int *ch);
 void moveresize(Window win, int x, int y, int w, int h);
-void setbg(Window win, int select);
+void setbg(Window win, int w, int h, int select);
 int max(int x, int y);
 int nextevent(XEvent *ev);
 Window createminiwindow(Window parent, int border);
