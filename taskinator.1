@@ -7,6 +7,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl dhivw
+.Op Fl a Ar atom
 .Op Fl g Ar geometry
 .Sh DESCRIPTION
 .Nm
@@ -15,6 +16,11 @@ with icons that, when clicked, changes the active window.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
+.It Fl a Ar atom
+Specify the atom containing the list of windows.
+If not specified, uses
+.Ic "_NET_CLIENT_LIST_STACKING" .
+It is an error if the atom is not interned on the X server.
 .It Fl d
 Show windows from all desktops.
 Without this option,

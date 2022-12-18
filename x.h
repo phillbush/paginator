@@ -6,7 +6,7 @@
 
 #define ICON_SIZE       16              /* preferred icon size */
 #define ALLDESKTOPS     0xFFFFFFFF
-#define PAGER_ACTION    ((long)(1 << 14))
+#define PAGER_ACTION    2
 
 enum {
 	COLOR_MID,
@@ -86,3 +86,4 @@ char *getresource(char *name, char *class);
 
 extern Atom atoms[];
 extern Window root;
+extern Display *dpy;

@@ -12,6 +12,7 @@
 #define DEF_WIDTH       125             /* default width for the pager */
 #define DEF_NCOLS       1               /* default number of columns */
 #define SEPARATOR_SIZE  1               /* size of the line between minidesktops */
+#define MOUSEEVENTMASK  (ButtonReleaseMask | PointerMotionMask)
 
 /* mini-desktop geometry */
 struct Desktop {
@@ -233,6 +234,8 @@ getoptions(int argc, char **argv)
 		case 'o':
 			if (strpbrk(optarg, "Vv") != NULL)
 				config.orient = _NET_WM_ORIENTATION_VERT;
+			else if (strpbrk(optarg, "Hh") != NULL)
+				config.orient = _NET_WM_ORIENTATION_HORZ;
 			break;
 		case 'w':
 			wflag = 1;
@@ -290,6 +293,8 @@ cleanclient(struct Client *cp)
 	destroyminiwindows(cp);
 	if (cp->icon != None)
 		freepicture(cp->icon);
+	if (pager.active == cp)
+		pager.active = NULL;
 	free(cp);
 }
 
@@ -767,16 +772,69 @@ initclients(void)
 	mapwin(pager.win);
 }
 
-/* if win is a mini-client-window, focus its client; if it's a mini-desk-window, change to its desktop */
+/* set desktop to that whose miniwindow is in given position relative to pager */
 static void
-focus(Window win, unsigned int button)
+setdeskbypos(int x, int y, unsigned long *desk)
 {
+	size_t i;
+
+	for (i = 0; i < pager.ndesktops; i++) {
+		if (x >= pager.desktops[i]->x && x < pager.desktops[i]->x + pager.desktops[i]->w &&
+		    y >= pager.desktops[i]->y && y < pager.desktops[i]->y + pager.desktops[i]->h) {
+			*desk = i;
+			return;
+		}
+	}
+}
+
+/* move window between desktops */
+static void
+mousemove(struct Client *cp, Window win, int x, int y)
+{
+	unsigned long newdesk, olddesk;
+	XEvent ev;
+
+	olddesk = newdesk = cp->desk;
+	reparentwin(
+		win, pager.win,
+		pager.desktops[cp->desk]->x + cp->x,
+		pager.desktops[cp->desk]->y + cp->y
+	);
+	XSync(dpy, False);
+	if (XGrabPointer(dpy, pager.win, False, ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime) != GrabSuccess)
+		goto done;
+	while (!XMaskEvent(dpy, MOUSEEVENTMASK, &ev)) {
+		switch (ev.type) {
+		case ButtonRelease:
+			setdeskbypos(ev.xbutton.x, ev.xbutton.y, &newdesk);
+			goto done;
+		case MotionNotify:
+			moveresize(win, ev.xmotion.x - x, ev.xmotion.y - y, cp->w, cp->h);
+			break;
+		}
+	}
+done:
+	XUngrabPointer(dpy, CurrentTime);
+	reparentwin(win, pager.desktops[olddesk]->miniwin, cp->x, cp->y);
+	if (newdesk != olddesk) {
+		clientmsg(cp->clientwin, atoms[_NET_WM_DESKTOP], newdesk, PAGER_ACTION, 0, 0, 0);
+	} else {
+		clientmsg(cp->clientwin, atoms[_NET_ACTIVE_WINDOW], 2, CurrentTime, 0, 0, 0);
+	}
+}
+
+/* act upon mouse button presses; basically focus window and change to its desktop */
+static void
+xeventbuttonpress(XEvent *e)
+{
+	XButtonEvent *ev;
 	size_t i, j;
 
-	if (button != Button1 && button != Button3)
+	ev = &e->xbutton;
+	if (ev->button != Button1 && ev->button != Button2)
 		return;
 	for (i = 0; i < pager.ndesktops; i++) {
-		if (win == pager.desktops[i]->miniwin) {
+		if (ev->window == pager.desktops[i]->miniwin) {
 			clientmsg(None, atoms[_NET_CURRENT_DESKTOP], i, CurrentTime, 0, 0, 0);
 			return;
 		}
@@ -785,25 +843,15 @@ focus(Window win, unsigned int button)
 		if (pager.clients[i] == NULL)
 			continue;
 		for (j = 0; j < pager.clients[i]->nminiwins; j++) {
-			if (win == pager.clients[i]->miniwins[j]) {
-				if (button == Button1)
-					clientmsg(pager.clients[i]->clientwin, atoms[_NET_ACTIVE_WINDOW], 2, CurrentTime, 0, 0, 0);
-				else
-					clientmsg(None, atoms[_NET_CURRENT_DESKTOP], i, CurrentTime, 0, 0, 0);
+			if (ev->window == pager.clients[i]->miniwins[j]) {
+				if (ev->button == Button1)
+					mousemove(pager.clients[i], ev->window, ev->x, ev->y);
+				else if (ev->button == Button2)
+					clientmsg(None, atoms[_NET_CURRENT_DESKTOP], pager.clients[i]->desk, CurrentTime, 0, 0, 0);
 				return;
 			}
 		}
 	}
-}
-
-/* act upon mouse button presses; basically focus window and change to its desktop */
-static void
-xeventbuttonrelease(XEvent *e)
-{
-	XButtonEvent *ev;
-
-	ev = &e->xbutton;
-	focus(ev->window, ev->button);
 }
 
 /* close paginator when receiving WM_DELETE_WINDOW */
@@ -905,7 +953,7 @@ main(int argc, char *argv[])
 {
 	XEvent ev;
 	void (*xevents[LASTEvent])(XEvent *) = {
-		[ButtonRelease]         = xeventbuttonrelease,
+		[ButtonPress]           = xeventbuttonpress,
 		[ConfigureNotify]       = xeventconfigurenotify,
 		[ClientMessage]         = xeventclientmessage,
 		[PropertyNotify]        = xeventpropertynotify,

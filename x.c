@@ -7,8 +7,10 @@
 #include <X11/Xproto.h>
 #include <X11/Xresource.h>
 #include <X11/Xutil.h>
+#include <X11/xpm.h>
 
 #include "x.h"
+#include "x.xpm"
 
 #define DEF_PADDING     2
 
@@ -19,18 +21,18 @@ struct DC {
 	unsigned long selbackground;
 	unsigned long background;
 	unsigned long separator;
+	Pixmap icon, mask;
 	int shadowthickness;
 };
 
 static int (*xerrorxlib)(Display *, XErrorEvent *);
 static struct DC dc;
-static Display *dpy;
 static Visual *visual;
 static XrmDatabase xdb = NULL;
 static Colormap colormap;
 static unsigned int depth;
 static int screen;
-static char *xrm = NULL;
+static char *xrm = NULL; Display *dpy;
 Atom atoms[ATOM_LAST];
 Window root;
 
@@ -75,33 +77,6 @@ prealpha(uint32_t p)
 	uint32_t rb = (a * (p & 0xFF00FFu)) >> 8u;
 	uint32_t g = (a * (p & 0x00FF00u)) >> 8u;
 	return (rb & 0xFF00FFu) | (g & 0x00FF00u) | (a << 24u);
-}
-
-static Pixmap
-geticccmicon(Window win, int *iconw, int *iconh, int *d)
-{
-	XWMHints *wmhints;
-	GC gc;
-	Pixmap pix = None;
-	Window dw;
-	int x, y, b;
-
-	if ((wmhints = XGetWMHints(dpy, win)) == NULL)
-		return None;
-	if (!(wmhints->flags & IconPixmapHint))
-		goto done;
-	if (!XGetGeometry(dpy, wmhints->icon_pixmap, &dw, &x, &y, iconw, iconh, &b, d))
-		goto done;
-	if (*iconw < 1 || *iconh < 1)
-		goto done;
-	pix = XCreatePixmap(dpy, root, *iconw, *iconh, *d);
-	gc = XCreateGC(dpy, pix, 0, NULL);
-	XSetForeground(dpy, gc, 1);
-	XFillRectangle(dpy, pix, gc, 0, 0, *iconw, *iconh);
-	XCopyArea(dpy, wmhints->icon_pixmap, pix, gc, 0, 0, *iconw, *iconh, 0, 0);
-done:
-	XFree(wmhints);
-	return pix;
 }
 
 static Pixmap
@@ -257,24 +232,15 @@ geticonprop(Window win)
 {
 	Pixmap pix;
 	Picture pic = None;
-	XRenderPictFormat xpf;
 	XTransform xf;
 	int iconw, iconh;
-	int icccm = 0;
 	int d;
 
-	if ((pix = getewmhicon(win, &iconw, &iconh, &d)) == None) {
-		pix = geticccmicon(win, &iconw, &iconh, &d);
-		icccm = 1;
-	}
+	if ((pix = getewmhicon(win, &iconw, &iconh, &d)) == None)
+		return None;
 	if (pix == None)
 		return None;
-	xpf.depth = d;
-	xpf.type = PictTypeDirect;
-	if (icccm)
-		pic = XRenderCreatePicture(dpy, pix, XRenderFindFormat(dpy, PictFormatType | PictFormatDepth, &xpf, 0), 0, NULL);
-	else
-		pic = XRenderCreatePicture(dpy, pix, XRenderFindStandardFormat(dpy, PictStandardARGB32), 0, NULL);
+	pic = XRenderCreatePicture(dpy, pix, XRenderFindStandardFormat(dpy, PictStandardARGB32), 0, NULL);
 	XFreePixmap(dpy, pix);
 	if (pic == None)
 		return None;
@@ -475,6 +441,7 @@ drawborder(Window win, int w, int h, int style)
 void
 drawbackground(Window win, Picture icon, int w, int h, int style)
 {
+	XGCValues val;
 	Picture pic;
 	Pixmap pix;
 
@@ -484,13 +451,21 @@ drawbackground(Window win, Picture icon, int w, int h, int style)
 		return;
 	XSetForeground(dpy, dc.gc, dc.windowcolors[style][COLOR_MID]);
 	XFillRectangle(dpy, pix, dc.gc, 0, 0, w, h);
-	if (icon != None) {
+	if (icon == None) {
+		val.clip_mask = dc.mask;
+		val.clip_x_origin = (w - ICON_SIZE) / 2;
+		val.clip_y_origin = (h - ICON_SIZE) / 2;
+		XChangeGC(dpy, dc.gc, GCClipMask | GCClipXOrigin | GCClipYOrigin, &val);
+		XCopyArea(dpy, dc.icon, pix, dc.gc, 0, 0, ICON_SIZE, ICON_SIZE, (w - ICON_SIZE) / 2, (h - ICON_SIZE) / 2);
+		val.clip_mask = None;
+		XChangeGC(dpy, dc.gc, GCClipMask | GCClipXOrigin | GCClipYOrigin, &val);
+	} else {
 		pic = XRenderCreatePicture(dpy, pix, XRenderFindVisualFormat(dpy, visual), 0, NULL);
 		if (pic != None) {
 			XRenderComposite(
 				dpy,
 				PictOpOver,
-				icon, None, pic,
+				icon, icon, pic,
 				0, 0, 0, 0,
 				(w - ICON_SIZE) / 2, (h - ICON_SIZE) / 2, w, h);
 			XRenderFreePicture(dpy, pic);
@@ -603,6 +578,8 @@ cleanx(void)
 		XFreeColors(dpy, colormap, dc.windowcolors[i], COLOR_LAST, 0);
 	XFreeColors(dpy, colormap, &dc.background, 1, 0);
 	XFreeGC(dpy, dc.gc);
+	XFreePixmap(dpy, dc.icon);
+	XFreePixmap(dpy, dc.mask);
 	XCloseDisplay(dpy);
 }
 
@@ -626,6 +603,8 @@ setcolors(const char *windowcolors[STYLE_LAST][COLOR_LAST], const char *selbackg
 void
 xinit(int *screenw, int *screenh)
 {
+	XpmAttributes xa;
+
 	if ((dpy = XOpenDisplay(NULL)) == NULL)
 		errx(1, "could not open display");
 	screen = DefaultScreen(dpy);
@@ -641,6 +620,11 @@ xinit(int *screenw, int *screenh)
 	XrmInitialize();
 	if ((xrm = XResourceManagerString(dpy)) != NULL)
 		xdb = XrmGetStringDatabase(xrm);
+	memset(&xa, 0, sizeof(xa));
+	if (XpmCreatePixmapFromData(dpy, root, x_xpm, &dc.icon, &dc.mask, &xa) != XpmSuccess)
+		errx(1, "could not load xpm");
+	if (!(xa.valuemask & XpmSize))
+		errx(1, "could not load xpm");
 	dc.gc = XCreateGC(
 		dpy,
 		root,

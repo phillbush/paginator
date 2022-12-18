@@ -32,6 +32,7 @@ struct Client {
 
 /* the pager */
 struct Pager {
+	Atom list;
 	struct Queue clientq;
 	struct Client *active;
 	Window win;
@@ -89,7 +90,7 @@ static struct Config config = {
 static void
 usage(void)
 {
-	(void)fprintf(stderr, "usage: paginator [-dhivw] [-g geometry]\n");
+	(void)fprintf(stderr, "usage: paginator [-dhivw] [-a atom] [-g geometry]\n");
 	exit(1);
 }
 
@@ -136,16 +137,21 @@ getoptions(int argc, char **argv)
 	int ch;
 	int x, y;
 
-	while ((ch = getopt(argc, argv, "dg:hivw")) != -1) {
+	while ((ch = getopt(argc, argv, "a:dg:hivw")) != -1) {
 		switch (ch) {
+		case 'a':
+			pager.list = XInternAtom(dpy, optarg, True);
+			if (pager.list == None)
+				errx(1, "atom does not exist: %s", optarg);
+			break;
 		case 'd': dflag = 1; break;
+		case 'g':
+			XParseGeometry(optarg, &x, &y, &pager.w, &pager.h);
+			break;
 		case 'h': hflag = 1; break;
 		case 'i': iflag = 1; break;
 		case 'v': vflag = 1; break;
 		case 'w': wflag = 1; break;
-		case 'g':
-			XParseGeometry(optarg, &x, &y, &pager.w, &pager.h);
-			break;
 		default:
 			usage();
 			break;
@@ -166,6 +172,8 @@ cleanclient(struct Client *cp)
 		destroywin(cp->miniwin);
 	if (cp->icon != None)
 		freepicture(cp->icon);
+	if (pager.active == cp)
+		pager.active = NULL;
 	TAILQ_REMOVE(&pager.clientq, cp, entries);
 }
 
@@ -271,18 +279,6 @@ getclient(Window win)
 	struct Client *cp;
 
 	TAILQ_FOREACH(cp, &pager.clientq, entries)
-		if (cp != NULL && cp->clientwin == win)
-			return cp;
-	return NULL;
-}
-
-/* return from client list the client with given client window; and delete it from client list */
-static struct Client *
-getdelclient(Window win)
-{
-	struct Client *cp;
-
-	TAILQ_FOREACH(cp, &pager.clientq, entries)
 		if (cp->clientwin == win)
 			return cp;
 	return NULL;
@@ -332,11 +328,11 @@ setclients(void)
 	size_t nclients;
 	size_t i;
 
-	nclients = getwinprop(root, atoms[_NET_CLIENT_LIST_STACKING], &wins);
+	nclients = getwinprop(root, pager.list, &wins);
 	TAILQ_FOREACH(cp, &pager.clientq, entries)
 		cp->exists = 0;
 	for (i = 0; i < nclients; i++) {
-		cp = getdelclient(wins[i]);
+		cp = getclient(wins[i]);
 		if (cp == NULL) {
 			cp = emalloc(sizeof(*cp));
 			*cp = (struct Client) {
@@ -502,7 +498,7 @@ xeventpropertynotify(XEvent *e)
 	 * remap or redraw the client and/or desktop miniwindows.
 	 */
 	ev = &e->xproperty;
-	if (ev->atom == atoms[_NET_CLIENT_LIST_STACKING]) {
+	if (ev->atom == pager.list) {
 		/* the list of windows was reset */
 		setclients();
 	} else if (ev->atom == atoms[_NET_ACTIVE_WINDOW]) {
@@ -552,6 +548,7 @@ main(int argc, char *argv[])
 		[PropertyNotify]        = xeventpropertynotify,
 	};
 	xinit(NULL, NULL);
+	pager.list = atoms[_NET_CLIENT_LIST_STACKING];
 	getresources();
 	getoptions(argc, argv);
 	setcolors(config.windowcolors, NULL, config.background, NULL, config.shadowthickness);
