@@ -789,27 +789,32 @@ setdeskbypos(int x, int y, unsigned long *desk)
 
 /* move window between desktops */
 static void
-mousemove(struct Client *cp, Window win, int x, int y)
+mousemove(struct Client *cp, Window win, int dx, int dy)
 {
-	unsigned long newdesk, olddesk;
 	XEvent ev;
+	unsigned long newdesk, olddesk;
+	int newx, newy;
 
+	if (cp->desk == ALLDESKTOPS) {
+		clientmsg(cp->clientwin, atoms[_NET_ACTIVE_WINDOW], 2, CurrentTime, 0, 0, 0);
+		return;
+	}
+	newx = pager.desktops[cp->desk]->x + cp->x;
+	newy = pager.desktops[cp->desk]->y + cp->y;
 	olddesk = newdesk = cp->desk;
-	reparentwin(
-		win, pager.win,
-		pager.desktops[cp->desk]->x + cp->x,
-		pager.desktops[cp->desk]->y + cp->y
-	);
+	reparentwin(win, pager.win, newx, newy);
 	XSync(dpy, False);
-	if (XGrabPointer(dpy, pager.win, False, ButtonReleaseMask | PointerMotionMask, GrabModeAsync, GrabModeAsync, None, None, CurrentTime) != GrabSuccess)
+	if (XGrabPointer(dpy, win, False, MOUSEEVENTMASK, GrabModeAsync, GrabModeAsync, None, None, CurrentTime) != GrabSuccess)
 		goto done;
 	while (!XMaskEvent(dpy, MOUSEEVENTMASK, &ev)) {
 		switch (ev.type) {
 		case ButtonRelease:
-			setdeskbypos(ev.xbutton.x, ev.xbutton.y, &newdesk);
+			setdeskbypos(newx + ev.xbutton.x, newy + ev.xbutton.y, &newdesk);
 			goto done;
 		case MotionNotify:
-			moveresize(win, ev.xmotion.x - x, ev.xmotion.y - y, cp->w, cp->h);
+			newx += ev.xmotion.x - dx;
+			newy += ev.xmotion.y - dy;
+			moveresize(win, newx, newy, cp->w, cp->h);
 			break;
 		}
 	}
