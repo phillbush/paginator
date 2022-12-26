@@ -638,7 +638,10 @@ setclients(void)
 	nclients = getwinprop(root, atoms[_NET_CLIENT_LIST_STACKING], &wins);
 	clients = ecalloc(nclients, sizeof(*clients));
 	for (i = 0; i < nclients; i++) {
-		oldcp = pager.nclients > 0 ? pager.clients[i] : NULL;
+		if ( pager.nclients > 0 && i < pager.nclients)
+			oldcp = pager.clients[i];
+		else
+			oldcp = NULL;
 		clients[i] = getdelclient(wins[i]);
 		if (oldcp == NULL || clients[i] == NULL || clients[i] != oldcp)
 			changed = 1;
