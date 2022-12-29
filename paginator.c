@@ -310,6 +310,7 @@ cleanclients(void)
 	}
 	free(pager.clients);
 	pager.clients = NULL;
+	pager.nclients = 0;
 }
 
 /* free pager window and pixmap */

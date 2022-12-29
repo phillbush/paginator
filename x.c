@@ -358,8 +358,9 @@ createwindow(int w, int h, int dockapp, char *class, int argc, char *argv[])
 	if (dockapp) {
 		if ((wmhints = XAllocWMHints()) == NULL)
 			errx(1, "XAllocWMHints");
-		wmhints->flags = IconWindowHint | StateHint;
+		wmhints->flags = IconWindowHint | StateHint | WindowGroupHint;
 		wmhints->initial_state = WithdrawnState;
+		wmhints->window_group = win,
 		wmhints->icon_window = win;
 	}
 	XmbSetWMProperties(dpy, win, class, class, argv, argc, NULL, wmhints, chint);
