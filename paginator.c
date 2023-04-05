@@ -921,6 +921,8 @@ xeventpropertynotify(XEvent *e)
 	 * remap or redraw the client and/or desktop miniwindows.
 	 */
 	ev = &e->xproperty;
+	if (ev->state != PropertyNewValue)
+		return;
 	if (ev->atom == atoms[_NET_CLIENT_LIST_STACKING]) {
 		/* the list of windows was reset */
 		setclients();
@@ -953,6 +955,12 @@ xeventpropertynotify(XEvent *e)
 		/* the urgency state of a window was reset */
 		cp = getclient(ev->window);
 		seturgency(cp);
+	} else if (ev->atom == atoms[_NET_WM_ICON] && iflag) {
+		if ((cp = getclient(ev->window)) == NULL)
+			return;
+		freepicture(cp->icon);
+		cp->icon = geticonprop(cp->clientwin);
+		drawclient(cp);
 	}
 }
 

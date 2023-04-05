@@ -539,6 +539,8 @@ destroywin(Window win)
 void
 freepicture(XID pic)
 {
+	if (pic == None)
+		return;
 	XRenderFreePicture(dpy, (Picture)pic);
 }
 
