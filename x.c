@@ -495,11 +495,11 @@ drawpager(Window win, int pagerw, int pagerh, int nrows, int ncols)
 	w = pagerw - ncols;
 	h = pagerh - nrows;
 	for (i = 1; i < ncols; i++) {
-		x = w * i / ncols + i - 1;
+		x = w * i / ncols + i;
 		XDrawLine(dpy, pix, dc.gc, x, 0, x, pagerh);
 	}
 	for (i = 1; i < nrows; i++) {
-		y = h * i / nrows + i - 1;
+		y = h * i / nrows + i;
 		XDrawLine(dpy, pix, dc.gc, 0, y, pagerw, y);
 	}
 	XCopyArea(dpy, pix, win, dc.gc, 0, 0, pagerw, pagerh, 0, 0);

@@ -348,8 +348,8 @@ setdeskgeom(void)
 	int x, y, w, h;
 	size_t i, xi, yi;
 
-	w = max(1, pager.w - pager.ncols);
-	h = max(1, pager.h - pager.nrows);
+	w = max(1, pager.w - pager.ncols + 1);
+	h = max(1, pager.h - pager.nrows + 1);
 	for (i = 0; i < pager.ndesktops; i++) {
 		xi = yi = i;
 		if (config.orient == _NET_WM_ORIENTATION_HORZ)
