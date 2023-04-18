@@ -468,7 +468,8 @@ drawbackground(Window win, Picture icon, int w, int h, int style)
 				PictOpOver,
 				icon, icon, pic,
 				0, 0, 0, 0,
-				(w - ICON_SIZE) / 2, (h - ICON_SIZE) / 2, w, h);
+				(w - ICON_SIZE) / 2, (h - ICON_SIZE) / 2,
+				ICON_SIZE, ICON_SIZE);
 			XRenderFreePicture(dpy, pic);
 		}
 	}
