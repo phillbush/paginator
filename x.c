@@ -564,7 +564,7 @@ setbg(Window win, int w, int h, int select)
 }
 
 void
-getgeometry(Window win, int *cx, int *cy, int *cw, int *ch)
+getgeometry(Window win, int *cx, int *cy, unsigned int *cw, unsigned int *ch)
 {
 	Window dw;
 	unsigned int du, b;

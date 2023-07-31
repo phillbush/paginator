@@ -28,8 +28,10 @@ struct Client {
 	size_t nminiwins;
 	size_t nmappedwins;
 	unsigned long desk;
-	int cx, cy, cw, ch;
-	int x, y, w, h;
+	int cx, cy;
+	unsigned int cw, ch;
+	int x, y;
+	unsigned int w, h;
 	int ishidden;
 	int ismapped;
 	int isurgent;
@@ -46,7 +48,7 @@ struct Pager {
 	unsigned long currdesktop;
 	int nrows, ncols;
 	int screenw, screenh;
-	int w, h;
+	unsigned int w, h;
 	int showingdesk;
 };
 
@@ -246,7 +248,6 @@ getoptions(int argc, char **argv)
 		}
 	}
 	argc -= optind;
-	argv += optind;
 	if (argc != 0) {
 		usage();
 	}
@@ -500,7 +501,7 @@ mapdrawall(void)
 
 /* set pager size */
 static int
-setpagersize(int w, int h)
+setpagersize(unsigned int w, unsigned int h)
 {
 	int ret;
 

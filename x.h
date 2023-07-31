@@ -75,7 +75,7 @@ void unmapwin(Window win);
 void reparentwin(Window win, Window parent, int x, int y);
 void freepicture(XID pic);
 void preparewin(Window win);
-void getgeometry(Window win, int *cx, int *cy, int *cw, int *ch);
+void getgeometry(Window win, int *cx, int *cy, unsigned int *cw, unsigned int *ch);
 void moveresize(Window win, int x, int y, int w, int h);
 void setbg(Window win, int w, int h, int select);
 int max(int x, int y);

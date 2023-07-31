@@ -37,7 +37,7 @@ struct Pager {
 	struct Client *active;
 	Window win;
 	unsigned long currdesktop;
-	int w, h;
+	unsigned int w, h;
 };
 
 /* whether we're running */
@@ -158,7 +158,6 @@ getoptions(int argc, char **argv)
 		}
 	}
 	argc -= optind;
-	argv += optind;
 	if (argc != 0) {
 		usage();
 	}
@@ -262,7 +261,7 @@ mapclients(void)
 
 /* set pager size */
 static int
-setpagersize(int w, int h)
+setpagersize(unsigned int w, unsigned int h)
 {
 	int ret;
 
