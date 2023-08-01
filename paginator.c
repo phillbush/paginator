@@ -1089,9 +1089,10 @@ mousemove(Pager *pager, Client *cp, Window win, int dx, int dy, Time time)
 	}
 	XTranslateCoordinates(
 		pager->display,
-		cp->clientwin,
+		win,
 		pager->window,
-		dx, dy,
+		0 - pager->borders[WIN_BORDER_WIDTH],
+		0 - pager->borders[WIN_BORDER_WIDTH],
 		&newx, &newy,
 		&dw
 	);
