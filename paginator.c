@@ -1232,6 +1232,7 @@ xeventconfigurenotify(Pager *pager, XEvent *e)
 		c->clientgeom.height = ev->height;
 		for (j = 0; j < pager->ndesktops; j++)
 			configureclient(pager, j, c);
+		drawclient(pager, c);
 		mapclient(pager, c);
 	}
 }
@@ -1302,7 +1303,8 @@ xeventpropertynotify(Pager *pager, XEvent *e)
 	} else if (ev->atom == pager->atoms[_NET_WM_ICON]) {
 		if ((cp = getclient(pager, ev->window)) == NULL)
 			return;
-		XRenderFreePicture(pager->display, cp->icon);
+		if (cp->icon != None)
+			XRenderFreePicture(pager->display, cp->icon);
 		cp->icon = geticonprop(pager, cp->clientwin);
 		drawclient(pager, cp);
 	}
@@ -1513,8 +1515,8 @@ setup(Pager *pager, int argc, char *argv[], char *name, char *geomstr)
 #undef  X
 	};
 	static struct {
-		enum Widget widget;
 		const char *class, *name;
+		enum Widget widget;
 		unsigned int red, green, blue;
 		unsigned int width, height;
 	} resdefs[NRESOURCES] = {
@@ -1870,8 +1872,10 @@ main(int argc, char *argv[])
 
 	geometry = NULL;
 	pager.xrm = getenv("RESOURCES_DATA");
-	if ((name = getenv("RESOURCES_NAME")) == NULL &&
-	    (argv[0] == NULL || argv[0][0] == '\0'))
+	name = getenv("RESOURCES_NAME");
+	if (name != NULL)
+		;
+	else if (argv[0] == NULL || argv[0][0] == '\0')
 		name = NULL;
 	else if ((name = strrchr(argv[0], '/')) != NULL)
 		name++;
