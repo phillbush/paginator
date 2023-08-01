@@ -66,7 +66,6 @@ This creates the following pager:
 
 ## License
 The code and manual are under the MIT/X license.
-The icons are in CC0/Public Domain.
 See `./LICENSE` for more information.
 
 ## Epilogue
