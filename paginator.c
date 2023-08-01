@@ -782,7 +782,7 @@ mapclient(Pager *pager, Client *cp)
 	Cardinal i;
 
 	for (i = 0; i < pager->ndesktops; i++) {
-		if (cp->desk == i) {
+		if (cp->desk == ALLDESKTOPS || cp->desk == i) {
 			XMapWindow(pager->display, cp->miniwins[i]);
 		} else {
 			XUnmapWindow(pager->display, cp->miniwins[i]);
@@ -859,9 +859,15 @@ mapclients(Pager *pager)
 static void
 redrawall(Pager *pager)
 {
+	Cardinal i, j;
+
 	setdeskgeom(pager);
 	drawdesktops(pager);
-	mapclients(pager);
+	for (i = 0; i < pager->nclients; i++) {
+		for (j = 0; j < pager->ndesktops; j++)
+			configureclient(pager, j, pager->clients[i]);
+		drawclient(pager, pager->clients[i]);
+	}
 }
 
 static int
@@ -1236,11 +1242,14 @@ xeventconfigurenotify(Pager *pager, XEvent *e)
 		pager->rootgeom.width = ev->width;
 		pager->rootgeom.height = ev->height;
 		redrawall(pager);
-	} else if (ev->window == pager->window) {
+		return;
+	}
+	if (ev->window == pager->window) {
 		/* the pager window may have been resized */
 		setpagersize(pager, ev->width, ev->height);
 		redrawall(pager);
-	} else if ((c = getclient(pager, ev->window)) != NULL) {
+	}
+	if ((c = getclient(pager, ev->window)) != NULL) {
 		/* a client window window may have been moved or resized */
 		c->clientgeom.x = ev->x;
 		c->clientgeom.y = ev->y;
@@ -1507,9 +1516,9 @@ clean(Pager *pager)
 			XFreePixmap(pager->display, color->pixmap);
 	}
 	if (pager->icon != None)
-		XFreePixmap(pager->display, pager->icon);
+		XRenderFreePicture(pager->display, pager->icon);
 	if (pager->mask != None)
-		XFreePixmap(pager->display, pager->mask);
+		XRenderFreePicture(pager->display, pager->mask);
 	if (pager->window != None)
 		XDestroyWindow(pager->display, pager->window);
 	XCloseDisplay(pager->display);
