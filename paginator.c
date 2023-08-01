@@ -1873,7 +1873,7 @@ main(int argc, char *argv[])
 	if ((name = getenv("RESOURCES_NAME")) == NULL &&
 	    (argv[0] == NULL || argv[0][0] == '\0'))
 		name = NULL;
-	else if ((name = strrchr(argv[0], '/')) == NULL)
+	else if ((name = strrchr(argv[0], '/')) != NULL)
 		name++;
 	else
 		name = argv[0];
