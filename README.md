@@ -1,8 +1,8 @@
 # Paginator
 
-<p align="center">
-  <img src="./demo.png", title="demo"/>
-</p>
+![demo](./demo.png)
+
+(Paginator is at the top right on the image.)
 
 Paginator is a desktop pager for EWMH-compliant X11 window managers.
 Paginator provides a graphical interface displaying the current
