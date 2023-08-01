@@ -950,6 +950,21 @@ setdesktop(Pager *pager, Client *cp)
 }
 
 static void
+raiseclients(Pager *pager)
+{
+	Cardinal i, j;
+
+	for (i = 0; i < pager->nclients; i++) {
+		for (j = 0; j < pager->ndesktops; j++) {
+			XRaiseWindow(
+				pager->display,
+				pager->clients[i]->miniwins[j]
+			);
+		}
+	}
+}
+
+static void
 setclients(Pager *pager)
 {
 	Client **clients;
@@ -1008,6 +1023,7 @@ setclients(Pager *pager)
 	pager->clients = clients;
 	pager->nclients = nclients;
 	XFree(wins);
+	raiseclients(pager);
 	mapclients(pager);
 }
 
