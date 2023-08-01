@@ -1,7 +1,7 @@
-PROGS = paginator taskinator
-OBJS = ${PROGS:=.o} x.o
+PROG = paginator
+OBJS = ${PROG:=.o}
 SRCS = ${OBJS:.o=.c}
-MANS = ${PROGS:=.1}
+MAN = ${PROG:=.1}
 
 PREFIX ?= /usr/local
 MANPREFIX ?= ${PREFIX}/share/man
@@ -19,10 +19,10 @@ PROG_LDFLAGS = ${LIBS} ${LDLIBS} ${LDFLAGS}
 bindir = ${DESTDIR}${PREFIX}/bin
 mandir = ${DESTDIR}${MANPREFIX}/man1
 
-all: ${PROGS}
+all: ${PROG}
 
-${PROGS}: ${@:=.o} x.o
-	${CC} -o $@ ${@:=.o} x.o ${PROG_LDFLAGS}
+${PROG}: ${OBJS}
+	${CC} -o $@ ${OBJS} ${PROG_LDFLAGS}
 
 .c.o:
 	${CC} ${PROG_CFLAGS} -o $@ -c $<
@@ -31,20 +31,20 @@ tags: ${SRCS}
 	ctags ${SRCS}
 
 lint: ${SRCS}
-	-mandoc -T lint -W warning ${MANS}
+	-mandoc -T lint -W warning ${MAN}
 	-clang-tidy ${SRCS} -- -std=c99 ${PROG_CFLAGS}
 
 clean:
-	rm -f ${OBJS} ${PROGS} ${PROGS:=.core} tags
+	rm -f ${OBJS} ${PROG} ${PROG:=.core} tags
 
 install: all
 	mkdir -p ${bindir}
 	mkdir -p ${mandir}
-	for file in ${PROGS} ; do install -m 755 "$$file" ${bindir}/"$$file" ; done
-	for file in ${MANS} ; do install -m 644 "$$file" ${mandir}/"$$file" ; done
+	install -m 755 ${PROG} ${bindir}/${PROG}
+	install -m 644 ${MAN} ${mandir}/${MAN}
 
 uninstall:
-	-for file in ${PROGS} ; do rm ${bindir}/"$$file" ; done
-	-for file in ${MANS} ; do rm ${mandir}/"$$file" ; done
+	-rm ${bindir}/${PROG}
+	-rm ${mandir}/${MAN}
 
 .PHONY: all clean install uninstall lint

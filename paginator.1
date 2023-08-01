@@ -1,4 +1,4 @@
-.Dd September 21, 2022
+.Dd July 31, 2023
 .Dt PAGINATOR 1
 .Os
 .Sh NAME
@@ -6,111 +6,123 @@
 .Nd X11 desktop pager
 .Sh SYNOPSIS
 .Nm
-.Op Fl iw
-.Op Fl c Ar corner
-.Op Fl g Ar geometry
-.Op Fl l Ar layout
-.Op Fl o Ar orientation
+.Op Fl geometry Ar geometry
+.Op Fl name Ar name
+.Op Fl xrm Ar resources
+.Ar nrows ncols
+.Op Ar primary secondary
 .Sh DESCRIPTION
 .Nm
 is a desktop pager for X11 that provides to the user a graphical interface
 to change the current desktop or the current window.
-It can also change the desktop of a window by drag-and-dropping it to
-another desktop on the pager.
+It displays a grid of desktop miniatures
+representing actual virtual desktops managed by the window manager;
+on each desktop miniature there are window miniatures
+representing actual client windows on the screen.
+Each window miniature is identified by the icon of the client window
+it represents.
+The user can change the desktop of a client by drag-and-dropping its
+window miniature to another desktop miniature on the pager.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
-.It Fl c Ar corner
-Specify the corner of the pager in which the first desktop should be placed.
-The argument for this option must be
-.Cm TL ,
-.Cm TR ,
-.Cm BL ,
-or
-.Cm BR
-(top-left, top-right, bottom-left, or bottom-right, respectively).
-If not provided, the starting corner will be top-left.
-.It Fl g Ar geometry
-Specify a size for the pager window.
-The argument for this option must be a geometry specification recognized by
-.Xr XParseGeometry 1
-If not provided, the window size will be computed from
-the pager layout, the number of desktops and the size of the screen.
-.It Fl i
-Draw window icons on the pager.
-.It Fl l Ar layout
-Specify the layout of the pager.
-The argument for this option must be in the format
-.Ar NCOLSPxNROWS ,
-where
-.Ar NCOLS
-is the number of columns in the pager, and
-.Ar NROWS
-is the number of rows in the pager.
-If not specified, the number of columns will be 2,
-and the number of rows will be computed from the number of desktops.
-.It Fl o Ar orientation
-Specify the orientation of the desktops on the pager.
-The argument for this option must be
-.Cm H ,
-or
-.Cm V
-(horizontal or vertical, respectively).
-If not provided, the starting corner will be horizontal.
-.It Fl w
-Start in the withdrawn mode.
-This makes
+.It Fl geometry Ar geometry
+Specify the initial size and location of the window.
+The format for the
+.Ar geometry
+argument is specified at
+.Xr XParseGeometry 3 .
+.It Fl name Ar name
+Specify the name of
 .Nm
-work like a dockapp.
+instance used to retrieve resources.
+If not specified, defaults to the value of the
+.Ev RESOURCES_NAME
+environment variable, or (if that variable is not set)
+to the basename of the command
+.Nm
+was invoked as.
+.It Fl xrm Ar resources
+Specify additional resources to merge on top of X11's resouces database.
+If not specified, defaults to the value of the
+.Ev RESOURCES_DATA
+environment variable, or (if that variable is not set)
+to the empty string.
 .El
 .Pp
+The first and second obligatory arguments,
+.Ar nrows
+and
+.Ar ncols
+are the number of rows and columns in the desktop grid.
+.Pp
+The first and second optional arguments,
+.Ar primary
+and
+.Ar secondary ,
+must each be set to either
+.Cm top ,
+.Cm bottom ,
+.Cm left ,
+or
+.Cm right .
+These values specify a top-to-bottom, bottom-to-top, left-to-right or right-to-left
+primary and secondary placement respectively.
+.Pp
 .Nm
-only works in cooperation with EWMH-compliant window managers.
-In particular, with window managers which set the
+only works in cooperation with EWMH-compliant window managers which set the
 _NET_CLIENT_LIST_STACKING and _NET_NUMBER_OF_DESKTOPS
 properties.
 .Sh RESOURCES
 .Nm
 understands the following X resources.
+.Pp
+Resources have the format
+.Ar "APPLICATION.WIDGET.RESOURCE"
+(or
+.Ar "APPLICATION.RESOURCE"
+for the geometry).
+.Ar APPLICATION
+must be either the
+.Qq Ic Paginator
+class or the name specified by the
+.Fl name
+command-line option.
+.Ar WIDGET
+must be either
+.Qq Ic pager
+for the pager itself, or
+.Qq Ic client
+for the client window miniatures.
 .Bl -tag -width Ds
-.It Ic "paginator.activeBackground"
+.It Ic client.activeBackground
 The color of the background of the active window.
-.It Ic "paginator.activeTopShadowColor"
-The color of the top 3D shadow of the active window.
-.It Ic "paginator.activeBottomShadowColor"
-The color of the bottom 3D shadow of the active window.
-.It Ic "paginator.background"
-The color of the background of the desktops.
-.It Ic "paginator.inactiveBackground"
-The color of the background of inactive windows.
-.It Ic "paginator.inactiveTopShadowColor"
-The color of the top 3D shadow of inactive windows.
-.It Ic "paginator.inactiveBottomShadowColor"
-The color of the bottom 3D shadow of inactive windows.
-.It Ic "paginator.orientation"
-The orientation of the desktops on the pager.
-Its value must be
-.Cm Horizontal
-or
-.Cm Vertical .
-.It Ic "paginator.numColumns"
-The number of columns in the pager.
-.It Ic "paginator.numRows"
-The number of rows in the pager.
-.It Ic "paginator.shadowThickness"
-Thickness of the 3D shadow effect, in pixels.
-.It Ic "paginator.selbackground"
-The color of the background of the active desktop.
-.It Ic "paginator.separator"
-The color of the separator between desktops.
-.It Ic "paginator.startingCorner"
-Specify the corner of the pager in which the first desktop should be placed.
-The argument for this option must be
-.Cm TopLeft ,
-.Cm TopRight ,
-.Cm BotomLeft ,
-or
-.Cm BotomRight .
+.It Ic client.activeBorderColor
+The color of the border of the active window.
+.It Ic client.activeTopShadowColor , client.activeBottomShadowColor
+The light and dark colors of the Motif-like 3D shadow of the active window.
+.It Ic client.borderWidth , pager.borderWidth
+The width in pixels of the borders of the window miniatures and the pager itself.
+.It Ic client.inactiveBackground
+The color of the background of the inactive window.
+.It Ic client.inactiveBorderColor
+The color of the border of the inactive window.
+.It Ic client.inactiveTopShadowColoror , client.inactiveBottomShadowColor
+The light and dark colors of the Motif-like 3D shadow of the inactive window.
+.It Ic client.urgentBackground
+The color of the background of the urgent window.
+.It Ic client.urgentBorderColor
+The color of the border of the urgent window.
+.It Ic client.urgentTopShadowColoror , client.urgentBottomShadowColor
+The light and dark colors of the Motif-like 3D shadow of the urgent window.
+.It Ic client.shadowThickness , pager.shadowThickness
+The width in pixels of the Motif-like 3D shadow border.
+.It Ic pager.background
+The color of the desktop miniatures.
+.It Ic pager.foreground
+The color of the desktop miniature for the current desktop.
+.It Ic geometry
+The initial size and location of the pager.
 .El
 .Sh ENVIRONMENT
 The following environment variables affect the execution of
@@ -121,6 +133,29 @@ The display to start
 .Nm
 on.
 .El
+.Sh EXAMPLES
+.Pp
+To create a pager with 6 virtual desktops distributed as follows...
+.Bd -literal -offset indent
++-------+-------+-------+
+|       |       |       |
+|   6   |   4   |   2   |
+|       |       |       |
++-------+-------+-------+
+|       |       |       |
+|   5   |   3   |   1   |
+|       |       |       |
++-------+-------+-------+
+.Ed
+.Pp
+\&...run the following command:
+.Bd -literal -offset indent
+$ paginator 2 3 bottom right
+.Ed
+.Pp
+The following command creates a pager with a 2x2 grid and default orientation:
+.Bd -literal -offset indent
+$ paginator 2 2
+.Ed
 .Sh SEE ALSO
-.Xr taskinator 1 ,
-.Xr X 1
+.Xr X 7
