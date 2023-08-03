@@ -221,6 +221,27 @@ usage(void)
 	exit(EXIT_FAILURE);
 }
 
+static int
+xerror(Display *display, XErrorEvent *event)
+{
+	char msg[128], number[128], req[128];
+
+	if (event->error_code == BadWindow)
+		return 0;
+	XGetErrorText(display, event->error_code, msg, sizeof(msg));
+	(void)snprintf(number, sizeof(number), "%d", event->request_code);
+	XGetErrorDatabaseText(
+		display,
+		"XRequest",
+		number,
+		"<unknown>",
+		req,
+		sizeof(req)
+	);
+	errx(EXIT_FAILURE, "%s (0x%08lX): %s", req, event->resourceid, msg);
+	return 0;               /* unreachable */
+}
+
 static void *
 emalloc(size_t size)
 {
@@ -911,6 +932,8 @@ setndesktops(Pager *pager)
 		pager->root,
 		pager->atoms[_NET_NUMBER_OF_DESKTOPS]
 	);
+	if (pager->ndesktops < 1)
+		return;
 	pager->desktops = ecalloc(pager->ndesktops, sizeof(*pager->desktops));
 	for (i = 0; i < pager->ndesktops; i++) {
 		pager->desktops[i].miniwin = createminiwindow(pager, pager->window, 0);
@@ -973,18 +996,21 @@ raiseclients(Pager *pager)
 static void
 setclients(Pager *pager)
 {
-	Client **clients;
-	Cardinal nclients;
-	Window *wins;
+	Client **clients = NULL;
+	Window *wins = NULL;
+	Cardinal nclients = 0;
 	Cardinal i, j;
 
-	nclients = getwinprop(
-		pager,
-		pager->root,
-		pager->atoms[_NET_CLIENT_LIST_STACKING],
-		&wins
-	);
-	clients = ecalloc(nclients, sizeof(*clients));
+	if (pager->ndesktops > 0) {
+		nclients = getwinprop(
+			pager,
+			pager->root,
+			pager->atoms[_NET_CLIENT_LIST_STACKING],
+			&wins
+		);
+	}
+	if (nclients > 0)
+		clients = ecalloc(nclients, sizeof(*clients));
 	for (i = 0; i < nclients; i++) {
 		clients[i] = NULL;
 		for (j = 0; j < pager->nclients; j++) {
@@ -1572,6 +1598,7 @@ setup(Pager *pager, int argc, char *argv[], char *name, char *geomstr)
 		warnx("could not connect to X server");
 		goto error;
 	}
+	(void)XSetErrorHandler(xerror);
 	screen = DefaultScreen(pager->display);
 	pager->root = RootWindow(pager->display, screen);
 	pager->rootgeom.width = DisplayWidth(pager->display, screen);
