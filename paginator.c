@@ -777,11 +777,11 @@ setdeskgeom(Pager *pager)
 
 	off = pager->borders[DESK_SHADOW_WIDTH];
 	w = pager->geometry.width;
-	w -= off * 2;
+	w -= off * 2 + 1;
 	if (w < 1)
 		w = 1;
 	h = pager->geometry.height;
-	h -= off * 2;
+	h -= off * 2 + 1;
 	if (h < 1)
 		h = 1;
 	for (i = 0; i < pager->ndesktops; i++) {
