@@ -273,6 +273,42 @@ max(int x, int y)
 	return x > y ? x : y;
 }
 
+static char *
+gettextprop(Display *display, Window window, Atom prop, Bool delete)
+{
+	char *text;
+	unsigned char *p;
+	unsigned long len;
+	unsigned long dl;               /* dummy variable */
+	int format, status;
+	Atom type;
+
+	text = NULL;
+	status = XGetWindowProperty(
+		display,
+		window,
+		prop,
+		0L,
+		0x1FFFFFFF,
+		delete,
+		AnyPropertyType,
+		&type, &format,
+		&len, &dl,
+		&p
+	);
+	if (status != Success || len == 0 || p == NULL) {
+		goto done;
+	}
+	if ((text = emalloc(len + 1)) == NULL) {
+		goto done;
+	}
+	memcpy(text, p, len);
+	text[len] = '\0';
+done:
+	XFree(p);
+	return text;
+}
+
 static Cardinal
 getcardprop(Pager *pager, Window window, Atom prop)
 {
@@ -1206,162 +1242,6 @@ done:
 }
 
 static void
-xeventbuttonpress(Pager *pager, XEvent *e)
-{
-	XButtonEvent *ev;
-	size_t i, j;
-
-	ev = &e->xbutton;
-	if (ev->button != Button1)
-		return;
-	for (i = 0; i < pager->ndesktops; i++) {
-		if (ev->window == pager->desktops[i].miniwin) {
-			clientmsg(
-				pager,
-				None,
-				pager->atoms[_NET_CURRENT_DESKTOP],
-				(Atom[]){i, CurrentTime, 0, 0, 0}
-			);
-			return;
-		}
-	}
-	for (i = 0; i < pager->nclients; i++) {
-		if (pager->clients[i] == NULL)
-			continue;
-		for (j = 0; j < pager->ndesktops; j++) {
-			if (ev->window != pager->clients[i]->miniwins[j])
-				continue;
-			mousemove(
-				pager,
-				pager->clients[i],
-				ev->window,
-				ev->x,
-				ev->y,
-				ev->time
-			);
-			return;
-		}
-	}
-}
-
-static void
-xeventclientmessage(Pager *pager, XEvent *e)
-{
-	XClientMessageEvent *ev;
-
-	ev = &e->xclient;
-	if ((Atom)ev->data.l[0] == pager->atoms[WM_DELETE_WINDOW]) {
-		pager->running = false;
-	}
-}
-
-static void
-xeventconfigurenotify(Pager *pager, XEvent *e)
-{
-	XConfigureEvent *ev;
-	Client *c;
-	Cardinal j;
-
-	ev = &e->xconfigure;
-	if (ev->window == pager->root) {
-		/* screen size changed (eg' a new monitor was plugged-in) */
-		pager->rootgeom.width = ev->width;
-		pager->rootgeom.height = ev->height;
-		redrawall(pager);
-		return;
-	}
-	if (ev->window == pager->window) {
-		/* the pager window may have been resized */
-		setpagersize(pager, ev->width, ev->height);
-		redrawall(pager);
-	}
-	if ((c = getclient(pager, ev->window)) != NULL) {
-		/* a client window window may have been moved or resized */
-		c->clientgeom.x = ev->x;
-		c->clientgeom.y = ev->y;
-		c->clientgeom.width = ev->width;
-		c->clientgeom.height = ev->height;
-		for (j = 0; j < pager->ndesktops; j++)
-			configureclient(pager, j, c);
-		drawclient(pager, c);
-		mapclient(pager, c);
-	}
-}
-
-static void
-xeventpropertynotify(Pager *pager, XEvent *e)
-{
-	Client *cp;
-	XPropertyEvent *ev;
-
-	/*
-	 * This routine is called when the value of a property has been
-	 * reset. If a known property was detected to be the reset one,
-	 * its internal value is reset (with a set*() function).
-	 *
-	 * Note that the value can by some reason not have changed, and
-	 * be equal to the previously stored one. In that case, the set
-	 * function will do nothing.
-	 *
-	 * But, if the value has been changed from the internal one, it
-	 * will then call the proper remapping or redrawing function to
-	 * remap or redraw the client and/or desktop miniwindows.
-	 */
-	ev = &e->xproperty;
-	if (ev->state != PropertyNewValue)
-		return;
-	if (ev->atom == pager->atoms[_NET_CLIENT_LIST_STACKING]) {
-		/* the list of windows was reset */
-		setclients(pager);
-		setactive(pager);
-	} else if (ev->atom == pager->atoms[_NET_ACTIVE_WINDOW]) {
-		/* the active window value was reset */
-		setactive(pager);
-	} else if (ev->atom == pager->atoms[_NET_CURRENT_DESKTOP]) {
-		/* the current desktop value was reset */
-		setcurrdesktop(pager);
-	} else if (ev->atom == pager->atoms[_NET_SHOWING_DESKTOP]) {
-		/* the value of the "showing desktop" state was reset */
-		setshowingdesk(pager);
-	} else if (ev->atom == pager->atoms[_NET_NUMBER_OF_DESKTOPS]) {
-		/* the number of desktops value was reset */
-		setndesktops(pager);
-		setdeskgeom(pager);
-		drawdesktops(pager);
-		setclients(pager);
-		setactive(pager);
-	} else if (ev->atom == pager->atoms[_NET_WM_STATE]) {
-		/* the list of states of a window (which may or may not include a relevant state) was reset */
-		if ((cp = getclient(pager, ev->window)) == NULL)
-			return;
-		sethidden(pager, cp);
-		setdesktop(pager, cp);
-		seturgency(pager, cp);
-		drawclient(pager, cp);
-		mapclient(pager, cp);
-	} else if (ev->atom == pager->atoms[_NET_WM_DESKTOP]) {
-		/* the desktop of a window was reset */
-		if ((cp = getclient(pager, ev->window)) == NULL)
-			return;
-		setdesktop(pager, cp);
-		mapclient(pager, cp);
-	} else if (ev->atom == XA_WM_HINTS) {
-		/* the urgency state of a window was reset */
-		if ((cp = getclient(pager, ev->window)) == NULL)
-			return;
-		seturgency(pager, cp);
-		drawclient(pager, cp);
-	} else if (ev->atom == pager->atoms[_NET_WM_ICON]) {
-		if ((cp = getclient(pager, ev->window)) == NULL)
-			return;
-		if (cp->icon != None)
-			XRenderFreePicture(pager->display, cp->icon);
-		cp->icon = geticonprop(pager, cp->clientwin);
-		drawclient(pager, cp);
-	}
-}
-
-static void
 setcolor(Pager *pager, const char *value, XRenderColor *color)
 {
 	XColor xcolor;
@@ -1527,6 +1407,179 @@ fillcolors(Pager *pager)
 }
 
 static void
+xeventbuttonpress(Pager *pager, XEvent *e)
+{
+	XButtonEvent *ev;
+	size_t i, j;
+
+	ev = &e->xbutton;
+	if (ev->button != Button1)
+		return;
+	for (i = 0; i < pager->ndesktops; i++) {
+		if (ev->window == pager->desktops[i].miniwin) {
+			clientmsg(
+				pager,
+				None,
+				pager->atoms[_NET_CURRENT_DESKTOP],
+				(Atom[]){i, CurrentTime, 0, 0, 0}
+			);
+			return;
+		}
+	}
+	for (i = 0; i < pager->nclients; i++) {
+		if (pager->clients[i] == NULL)
+			continue;
+		for (j = 0; j < pager->ndesktops; j++) {
+			if (ev->window != pager->clients[i]->miniwins[j])
+				continue;
+			mousemove(
+				pager,
+				pager->clients[i],
+				ev->window,
+				ev->x,
+				ev->y,
+				ev->time
+			);
+			return;
+		}
+	}
+}
+
+static void
+xeventclientmessage(Pager *pager, XEvent *e)
+{
+	XClientMessageEvent *ev;
+
+	ev = &e->xclient;
+	if ((Atom)ev->data.l[0] == pager->atoms[WM_DELETE_WINDOW]) {
+		pager->running = false;
+	}
+}
+
+static void
+xeventconfigurenotify(Pager *pager, XEvent *e)
+{
+	XConfigureEvent *ev;
+	Client *c;
+	Cardinal j;
+
+	ev = &e->xconfigure;
+	if (ev->window == pager->root) {
+		/* screen size changed (eg' a new monitor was plugged-in) */
+		pager->rootgeom.width = ev->width;
+		pager->rootgeom.height = ev->height;
+		redrawall(pager);
+		return;
+	}
+	if (ev->window == pager->window) {
+		/* the pager window may have been resized */
+		setpagersize(pager, ev->width, ev->height);
+		redrawall(pager);
+	}
+	if ((c = getclient(pager, ev->window)) != NULL) {
+		/* a client window window may have been moved or resized */
+		c->clientgeom.x = ev->x;
+		c->clientgeom.y = ev->y;
+		c->clientgeom.width = ev->width;
+		c->clientgeom.height = ev->height;
+		for (j = 0; j < pager->ndesktops; j++)
+			configureclient(pager, j, c);
+		drawclient(pager, c);
+		mapclient(pager, c);
+	}
+}
+
+static void
+xeventpropertynotify(Pager *pager, XEvent *e)
+{
+	Client *cp;
+	XPropertyEvent *ev;
+	char *str;
+
+	/*
+	 * This routine is called when the value of a property has been
+	 * reset. If a known property was detected to be the reset one,
+	 * its internal value is reset (with a set*() function).
+	 *
+	 * Note that the value can by some reason not have changed, and
+	 * be equal to the previously stored one. In that case, the set
+	 * function will do nothing.
+	 *
+	 * But, if the value has been changed from the internal one, it
+	 * will then call the proper remapping or redrawing function to
+	 * remap or redraw the client and/or desktop miniwindows.
+	 */
+	ev = &e->xproperty;
+	if (ev->state != PropertyNewValue)
+		return;
+	if (ev->atom == pager->atoms[_NET_CLIENT_LIST_STACKING]) {
+		/* the list of windows was reset */
+		setclients(pager);
+		setactive(pager);
+	} else if (ev->atom == pager->atoms[_NET_ACTIVE_WINDOW]) {
+		/* the active window value was reset */
+		setactive(pager);
+	} else if (ev->atom == pager->atoms[_NET_CURRENT_DESKTOP]) {
+		/* the current desktop value was reset */
+		setcurrdesktop(pager);
+	} else if (ev->atom == pager->atoms[_NET_SHOWING_DESKTOP]) {
+		/* the value of the "showing desktop" state was reset */
+		setshowingdesk(pager);
+	} else if (ev->atom == pager->atoms[_NET_NUMBER_OF_DESKTOPS]) {
+		/* the number of desktops value was reset */
+		setndesktops(pager);
+		setdeskgeom(pager);
+		drawdesktops(pager);
+		setclients(pager);
+		setactive(pager);
+	} else if (ev->atom == pager->atoms[_NET_WM_STATE]) {
+		/* the list of states of a window (which may or may not include a relevant state) was reset */
+		if ((cp = getclient(pager, ev->window)) == NULL)
+			return;
+		sethidden(pager, cp);
+		setdesktop(pager, cp);
+		seturgency(pager, cp);
+		drawclient(pager, cp);
+		mapclient(pager, cp);
+	} else if (ev->atom == pager->atoms[_NET_WM_DESKTOP]) {
+		/* the desktop of a window was reset */
+		if ((cp = getclient(pager, ev->window)) == NULL)
+			return;
+		setdesktop(pager, cp);
+		mapclient(pager, cp);
+	} else if (ev->atom == XA_WM_HINTS) {
+		/* the urgency state of a window was reset */
+		if ((cp = getclient(pager, ev->window)) == NULL)
+			return;
+		seturgency(pager, cp);
+		drawclient(pager, cp);
+	} else if (ev->atom == pager->atoms[_NET_WM_ICON]) {
+		if ((cp = getclient(pager, ev->window)) == NULL)
+			return;
+		if (cp->icon != None)
+			XRenderFreePicture(pager->display, cp->icon);
+		cp->icon = geticonprop(pager, cp->clientwin);
+		drawclient(pager, cp);
+	} else if (ev->atom == XA_RESOURCE_MANAGER) {
+		if (ev->window != pager->root)
+			return;
+		str = gettextprop(
+			pager->display,
+			pager->root,
+			XA_RESOURCE_MANAGER,
+			False
+		);
+		if (str == NULL)
+			return;
+		loadresources(pager, str);
+		free(str);
+		fillcolors(pager);
+		redrawall(pager);
+		drawpager(pager);
+	}
+}
+
+static void
 clean(Pager *pager)
 {
 	size_t i;
@@ -1603,6 +1656,7 @@ setup(Pager *pager, int argc, char *argv[], char *name, char *geomstr)
 	pager->root = RootWindow(pager->display, screen);
 	pager->rootgeom.width = DisplayWidth(pager->display, screen);
 	pager->rootgeom.height = DisplayHeight(pager->display, screen);
+	(void)XSelectInput(pager->display, pager->root, PropertyChangeMask);
 	preparewin(pager, pager->root);
 
 	/* get visual format */
