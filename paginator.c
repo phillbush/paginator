@@ -38,31 +38,29 @@
 	X(_NET_WM_STATE_STICKY)          \
 	X(_NET_WM_STATE_DEMANDS_ATTENTION)
 
-#define NCOLORS         20      /* number of color resources */
+#define NCOLORS         17      /* number of color resources */
 #define RESOURCES                                                                       \
 	/* ENUM             CLASS                NAME                         DEFAULT */\
 	/* color resources MUST be listed first; values are RGB channels              */\
-	X(RES_DESK_BG,      "Background",        "background",                0x505075 )\
-	X(RES_DESK_FG,      "Foreground",        "foreground",                0xAAAAAA )\
-	X(RES_DESK_BOR,     "SeparatorColor",    "separatorColor",            0x000000 )\
-	X(RES_DESK_TOP,     "TopShadowColor",    "topShadowColor",            0xFFFFFF )\
-	X(RES_DESK_BOT,     "BottomShadowColor", "bottomShadowColor",         0x000000 )\
 	X(RES_ACTIVE_BG,    "Background",        "activeBackground",          0x000000 )\
-	X(RES_ACTIVE_FG,    "Foreground",        "activeForeground",          0x000000 )\
 	X(RES_ACTIVE_BOR,   "BorderColor",       "activeBorderColor",         0x000000 )\
 	X(RES_ACTIVE_TOP,   "TopShadowColor",    "activeTopShadowColor",      0xB6B6B6 )\
 	X(RES_ACTIVE_BOT,   "BottomShadowColor", "activeBottomShadowColor",   0x616161 )\
 	X(RES_URGENT_BG,    "Background",        "urgentBackground",          0xFC6161 )\
-	X(RES_URGENT_FG,    "Foreground",        "urgentForeground",          0xFC6161 )\
 	X(RES_URGENT_BOR,   "BorderColor",       "urgentBorderColor",         0x000000 )\
 	X(RES_URGENT_TOP,   "TopShadowColor",    "urgentTopShadowColor",      0xF7D9D9 )\
 	X(RES_URGENT_BOT,   "BottomShadowColor", "urgentBottomShadowColor",   0x9B1D1D )\
 	X(RES_INACTIVE_BG,  "Background",        "inactiveBackground",        0xAAAAAA )\
-	X(RES_INACTIVE_FG,  "Foreground",        "inactiveBackground",        0xAAAAAA )\
 	X(RES_INACTIVE_BOR, "BorderColor",       "inactiveBorderColor",       0x000000 )\
 	X(RES_INACTIVE_TOP, "TopShadowColor",    "inactiveTopShadowColor",    0xFFFFFF )\
 	X(RES_INACTIVE_BOT, "BottomShadowColor", "inactiveBottomShadowColor", 0x555555 )\
+	X(RES_DESK_BG,      "Background",        "desktopBackground",         0x505075 )\
+	X(RES_DESK_BOR,     "SeparatorColor",    "separatorColor",            0x000000 )\
+	X(RES_DESK_TOP,     "TopShadowColor",    "frameTopShadowColor",       0x000000 )\
+	X(RES_DESK_BOT,     "BottomShadowColor", "frameBottomShadowColor",    0xFFFFFF )\
+	X(RES_DESK_FG,      "Background",        "currentDesktopBackground",  0xAAAAAA )\
 	/* width resources MUST be listed next; value is width in pixels              */\
+	X(RES_FRAME,        "ShadowThickness",   "frameShadowThickness",      1        )\
 	X(RES_BORDER,       "BorderWidth",       "borderWidth",               1        )\
 	X(RES_SHADOW,       "ShadowThickness",   "shadowThickness",           1        )\
 	X(RES_SEPARATOR,    "SeparatorWidth",    "separatorWidth",            1        )\
@@ -86,6 +84,7 @@ enum Resource {
 };
 
 enum Width {
+	FRAME_WIDTH,
 	BORDER_WIDTH,
 	SHADOW_WIDTH,
 	SEPARATOR_WIDTH,
@@ -94,17 +93,15 @@ enum Width {
 
 enum Colors {
 	COLOR_BG     = 0,
-	COLOR_FG     = 1,
-	COLOR_BOR    = 2,
-	COLOR_TOP    = 3,
-	COLOR_BOT    = 4,
+	COLOR_BOR    = 1,
+	COLOR_TOP    = 2,
+	COLOR_BOT    = 3,
+	COLOR_FG     = 4,       /* extra, for DESKTOP only */
 
-	SCM_SIZE     = 5,
-
-	SCM_DESKTOP  = 0,
-	SCM_ACTIVE   = 1,
-	SCM_URGENT   = 2,
-	SCM_INACTIVE = 3,
+	SCM_ACTIVE   = 0,
+	SCM_URGENT   = 4,
+	SCM_INACTIVE = 8,
+	SCM_DESKTOP  = 12,
 };
 
 enum Orientation {
@@ -571,25 +568,21 @@ cleanclients(Pager *pager)
 }
 
 static void
-drawshadows(Pager *pager, Picture picture, int scheme, XRectangle *geometry, bool reverse)
+drawshadows(Pager *pager, Picture picture, int scheme, XRectangle *geometry)
 {
-	int i, w, top, bot;
+	int i, w;
 
-	if (reverse) {
-		top = COLOR_BOT;
-		bot = COLOR_TOP;
-	} else {
-		top = COLOR_TOP;
-		bot = COLOR_BOT;
-	}
-	w = pager->borders[SHADOW_WIDTH];
+	if (scheme == SCM_DESKTOP)
+		w = pager->borders[FRAME_WIDTH];
+	else
+		w = pager->borders[SHADOW_WIDTH];
 	for(i = 0; i < w; i++) {
 		/* draw light shadow */
 		XRenderFillRectangle(
 			pager->display,
 			PictOpSrc,
 			picture,
-			&pager->colors[SCM_SIZE * scheme + top].channels,
+			&pager->colors[scheme + COLOR_TOP].channels,
 			i, i,
 			1, geometry->height - (i * 2 + 1)
 		);
@@ -597,7 +590,7 @@ drawshadows(Pager *pager, Picture picture, int scheme, XRectangle *geometry, boo
 			pager->display,
 			PictOpSrc,
 			picture,
-			&pager->colors[SCM_SIZE * scheme + top].channels,
+			&pager->colors[scheme + COLOR_TOP].channels,
 			i, i,
 			geometry->width - (i * 2 + 1), 1
 		);
@@ -607,7 +600,7 @@ drawshadows(Pager *pager, Picture picture, int scheme, XRectangle *geometry, boo
 			pager->display,
 			PictOpSrc,
 			picture,
-			&pager->colors[SCM_SIZE * scheme + bot].channels,
+			&pager->colors[scheme + COLOR_BOT].channels,
 			geometry->width - 1 - i, i,
 			1, geometry->height - i * 2
 		);
@@ -615,7 +608,7 @@ drawshadows(Pager *pager, Picture picture, int scheme, XRectangle *geometry, boo
 			pager->display,
 			PictOpSrc,
 			picture,
-			&pager->colors[SCM_SIZE * scheme + bot].channels,
+			&pager->colors[scheme + COLOR_BOT].channels,
 			i, geometry->height - 1 - i,
 			geometry->width - i * 2, 1
 		);
@@ -660,7 +653,7 @@ drawclient(Pager *pager, Client *cp)
 			pager->display,
 			PictOpSrc,
 			picture,
-			&pager->colors[SCM_SIZE * scheme + COLOR_BG].channels,
+			&pager->colors[scheme + COLOR_BG].channels,
 			0, 0,
 			cp->minigeoms[i].width,
 			cp->minigeoms[i].height
@@ -674,7 +667,7 @@ drawclient(Pager *pager, Client *cp)
 			(cp->minigeoms[i].height - ICON_SIZE) / 2,
 			ICON_SIZE, ICON_SIZE
 		);
-		drawshadows(pager, picture, scheme, &cp->minigeoms[i], false);
+		drawshadows(pager, picture, scheme, &cp->minigeoms[i]);
 		XSetWindowBackgroundPixmap(
 			pager->display,
 			cp->miniwins[i],
@@ -683,7 +676,7 @@ drawclient(Pager *pager, Client *cp)
 		XSetWindowBorderPixmap(
 			pager->display,
 			cp->miniwins[i],
-			pager->colors[SCM_SIZE * scheme + COLOR_BOR].pixmap
+			pager->colors[scheme + COLOR_BOR].pixmap
 		);
 		XClearWindow(pager->display, cp->miniwins[i]);
 		XRenderFreePicture(pager->display, picture);
@@ -714,12 +707,12 @@ drawpager(Pager *pager)
 		pager->display,
 		PictOpSrc,
 		picture,
-		&pager->colors[SCM_SIZE * SCM_DESKTOP + COLOR_BOR].channels,
+		&pager->colors[SCM_DESKTOP + COLOR_BOR].channels,
 		0, 0,
 		pager->geometry.width,
 		pager->geometry.height
 	);
-	drawshadows(pager, picture, SCM_DESKTOP, &pager->geometry, true);
+	drawshadows(pager, picture, SCM_DESKTOP, &pager->geometry);
 	XSetWindowBackgroundPixmap(
 		pager->display,
 		pager->window,
@@ -738,9 +731,9 @@ drawdesktops(Pager *pager)
 
 	for (i = 0; i < pager->ndesktops; i++) {
 		if (i == pager->activedesktop)
-			pixmap = pager->colors[SCM_SIZE * SCM_DESKTOP + COLOR_FG].pixmap;
+			pixmap = pager->colors[SCM_DESKTOP + COLOR_FG].pixmap;
 		else
-			pixmap = pager->colors[SCM_SIZE * SCM_DESKTOP + COLOR_BG].pixmap;
+			pixmap = pager->colors[SCM_DESKTOP + COLOR_BG].pixmap;
 		XSetWindowBackgroundPixmap(
 			pager->display,
 			pager->desktops[i].miniwin,
@@ -758,13 +751,15 @@ setdeskgeom(Pager *pager)
 	XRectangle *geometry;
 	Cardinal i;
 
-	off = pager->borders[SHADOW_WIDTH];
+	off = pager->borders[FRAME_WIDTH];
 	w = pager->geometry.width;
-	w -= off * 2 + 1;
+	w -= off * 2;
+	w -= pager->borders[SEPARATOR_WIDTH] * (pager->ncols - 1);
 	if (w < 1)
 		w = 1;
 	h = pager->geometry.height;
-	h -= off * 2 + 1;
+	h -= off * 2;
+	h -= pager->borders[SEPARATOR_WIDTH] * (pager->nrows - 1);
 	if (h < 1)
 		h = 1;
 	for (i = 0; i < pager->ndesktops; i++) {
@@ -1847,7 +1842,7 @@ setcorner(Pager *pager, char *grid[], char *borders[])
 	switch (borders[0][0]) {
 	case 'l': case 'L':
 		pager->orient = _NET_WM_ORIENTATION_HORZ;
-		switch (borders[0][0]) {
+		switch (borders[1][0]) {
 		case 'l': case 'L':
 		case 'r': case 'R':
 			errx(EXIT_FAILURE, "%s: repeated border", borders[1]);
@@ -1863,7 +1858,7 @@ setcorner(Pager *pager, char *grid[], char *borders[])
 		break;
 	case 'r': case 'R':
 		pager->orient = _NET_WM_ORIENTATION_HORZ;
-		switch (borders[0][0]) {
+		switch (borders[1][0]) {
 		case 'l': case 'L':
 		case 'r': case 'R':
 			errx(EXIT_FAILURE, "%s: repeated border", borders[1]);
@@ -1879,7 +1874,7 @@ setcorner(Pager *pager, char *grid[], char *borders[])
 		break;
 	case 't': case 'T':
 		pager->orient = _NET_WM_ORIENTATION_VERT;
-		switch (borders[0][0]) {
+		switch (borders[1][0]) {
 		case 'l': case 'L':
 			pager->corner = _NET_WM_TOPLEFT;
 			break;
@@ -1896,7 +1891,7 @@ setcorner(Pager *pager, char *grid[], char *borders[])
 		break;
 	case 'b': case 'B':
 		pager->orient = _NET_WM_ORIENTATION_VERT;
-		switch (borders[0][0]) {
+		switch (borders[1][0]) {
 		case 'l': case 'L':
 			pager->corner = _NET_WM_BOTTOMLEFT;
 			break;

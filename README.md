@@ -24,16 +24,8 @@ Paginator understand the following command-line options.
 ## Customization
 Paginator can be customized by setting the following X resources.
 
-* `Paginator.background`:
-  Color of a desktop miniature.
-* `Paginator.foreground`:
-  Color of the current desktop miniature.
 * `Paginator.separatorColor`:
   Color of the separator between desktop miniatures.
-* `Paginator.topShadowColor`:
-  Color of the light shadow around Paginator.
-* `Paginator.bottomShadowColor`:
-  Color of the heavy shadow around Paginator.
 * `Paginator.activeBackground`:
   Color of the miniature of the active window.
 * `Paginator.activeBorderColor`:
@@ -42,6 +34,16 @@ Paginator can be customized by setting the following X resources.
   Color of the light shadow of the miniature of the active window.
 * `Paginator.activeBottomShadowColor`:
   Color of the heavy shadow of the miniature of the active window.
+* `Paginator.currentDesktopBackground`:
+  Color of the current desktop miniature.
+* `Paginator.desktopBackground`:
+  Color of a desktop miniature.
+* `Paginator.frameTopShadowColor`:
+  Color of the light shadow around Paginator.
+* `Paginator.frameBottomShadowColor`:
+  Color of the heavy shadow around Paginator.
+* `Paginator.frameShadowThickness`:
+  Width in pixels of the 3D shadow frame around Paginator.
 * `Paginator.inactiveBackground`:
   Color of the miniature of a regular window.
 * `Paginator.inactiveBorderColor`:
