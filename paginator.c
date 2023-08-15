@@ -14,6 +14,8 @@
 
 #include "x.xpm"
 
+#define APP_CLASS       "Paginator"
+#define APP_NAME        "paginator"
 #define MAX_VALUE       32767   /* 2^15-1 */
 #define ICON_SIZE       16
 #define ALLDESKTOPS     0xFFFFFFFF
@@ -36,43 +38,36 @@
 	X(_NET_WM_STATE_STICKY)          \
 	X(_NET_WM_STATE_DEMANDS_ATTENTION)
 
-#define WIDGETS                                 \
-	/*            CLASS        NAME       */\
-	X(WID_APP,    "Paginator", "paginator" )\
-	X(WID_PAGER,  "Pager",     "pager"     )\
-	X(WID_CLIENT, "Client",    "client"    )
-
 #define NCOLORS         20      /* number of color resources */
-#define RESOURCES                                                                                                 \
-	/* ENUM         WIDGET      CLASS                NAME                             VALUES                */\
-	/* color resources MUST be listed first; values are RGB channels                                        */\
-	X(RES_DESK_BG,      WID_PAGER,  "Background",        "background",                0x5000, 0x5000, 0x7500 )\
-	X(RES_DESK_FG,      WID_PAGER,  "Foreground",        "foreground",                0xAA00, 0xAA00, 0xAA00 )\
-	X(RES_DESK_BOR,     WID_PAGER,  "BorderColor",       "borderColor",               0x0000, 0x0000, 0x0000 )\
-	X(RES_DESK_TOP,     WID_PAGER,  "TopShadowColor",    "topShadowColor",            0xFFFF, 0xFFFF, 0xFFFF )\
-	X(RES_DESK_BOT,     WID_PAGER,  "BottomShadowColor", "bottomShadowColor",         0x0000, 0x0000, 0x0000 )\
-	X(RES_ACTIVE_BG,    WID_CLIENT, "Background",        "activeBackground",          0x0000, 0x0000, 0x0000 )\
-	X(RES_ACTIVE_FG,    WID_CLIENT, "Foreground",        "activeForeground",          0x0000, 0x0000, 0x0000 )\
-	X(RES_ACTIVE_BOR,   WID_CLIENT, "BorderColor",       "activeBorderColor",         0x0000, 0x0000, 0x0000 )\
-	X(RES_ACTIVE_TOP,   WID_CLIENT, "TopShadowColor",    "activeTopShadowColor",      0xB600, 0xB600, 0xB600 )\
-	X(RES_ACTIVE_BOT,   WID_CLIENT, "BottomShadowColor", "activeBottomShadowColor",   0x6100, 0x6100, 0x6100 )\
-	X(RES_URGENT_BG,    WID_CLIENT, "Background",        "urgentBackground",          0xFC00, 0x6100, 0x6100 )\
-	X(RES_URGENT_FG,    WID_CLIENT, "Foreground",        "urgentForeground",          0xFC00, 0x6100, 0x6100 )\
-	X(RES_URGENT_BOR,   WID_CLIENT, "BorderColor",       "urgentBorderColor",         0x0000, 0x0000, 0x0000 )\
-	X(RES_URGENT_TOP,   WID_CLIENT, "TopShadowColor",    "urgentTopShadowColor",      0xF700, 0xD900, 0xD900 )\
-	X(RES_URGENT_BOT,   WID_CLIENT, "BottomShadowColor", "urgentBottomShadowColor",   0x9B00, 0x1D00, 0x1D00 )\
-	X(RES_INACTIVE_BG,  WID_CLIENT, "Background",        "inactiveBackground",        0xAA00, 0xAA00, 0xAA00 )\
-	X(RES_INACTIVE_FG,  WID_CLIENT, "Foreground",        "inactiveBackground",        0xAA00, 0xAA00, 0xAA00 )\
-	X(RES_INACTIVE_BOR, WID_CLIENT, "BorderColor",       "inactiveBorderColor",       0x0000, 0x0000, 0x0000 )\
-	X(RES_INACTIVE_TOP, WID_CLIENT, "TopShadowColor",    "inactiveTopShadowColor",    0xFFFF, 0xFFFF, 0xFFFF )\
-	X(RES_INACTIVE_BOT, WID_CLIENT, "BottomShadowColor", "inactiveBottomShadowColor", 0x5500, 0x5500, 0x5500 )\
-	/* width resources MUST be listed next; 1st value is width in pixels, rest is ignored                   */\
-	X(RES_DESK_BORDER,  WID_PAGER,  "BorderWidth",       "borderWidth",               1,      0,      0      )\
-	X(RES_DESK_SHADOW,  WID_PAGER,  "ShadowThickness",   "shadowThickness",           1,      0,      0      )\
-	X(RES_WIN_BORDER,   WID_CLIENT, "BorderWidth",       "borderWidth",               1,      0,      0      )\
-	X(RES_WIN_SHADOW,   WID_CLIENT, "ShadowThickness",   "shadowThickness",           1,      0,      0      )\
-	/* geometry resources; 1st and 2nd values are width and height in pixels; rest is ignored               */\
-	X(RES_GEOMETRY,     WID_APP,    "Geometry",          "geometry",                  58,     58,     0      )\
+#define RESOURCES                                                                       \
+	/* ENUM             CLASS                NAME                         DEFAULT */\
+	/* color resources MUST be listed first; values are RGB channels              */\
+	X(RES_DESK_BG,      "Background",        "background",                0x505075 )\
+	X(RES_DESK_FG,      "Foreground",        "foreground",                0xAAAAAA )\
+	X(RES_DESK_BOR,     "SeparatorColor",    "separatorColor",            0x000000 )\
+	X(RES_DESK_TOP,     "TopShadowColor",    "topShadowColor",            0xFFFFFF )\
+	X(RES_DESK_BOT,     "BottomShadowColor", "bottomShadowColor",         0x000000 )\
+	X(RES_ACTIVE_BG,    "Background",        "activeBackground",          0x000000 )\
+	X(RES_ACTIVE_FG,    "Foreground",        "activeForeground",          0x000000 )\
+	X(RES_ACTIVE_BOR,   "BorderColor",       "activeBorderColor",         0x000000 )\
+	X(RES_ACTIVE_TOP,   "TopShadowColor",    "activeTopShadowColor",      0xB6B6B6 )\
+	X(RES_ACTIVE_BOT,   "BottomShadowColor", "activeBottomShadowColor",   0x616161 )\
+	X(RES_URGENT_BG,    "Background",        "urgentBackground",          0xFC6161 )\
+	X(RES_URGENT_FG,    "Foreground",        "urgentForeground",          0xFC6161 )\
+	X(RES_URGENT_BOR,   "BorderColor",       "urgentBorderColor",         0x000000 )\
+	X(RES_URGENT_TOP,   "TopShadowColor",    "urgentTopShadowColor",      0xF7D9D9 )\
+	X(RES_URGENT_BOT,   "BottomShadowColor", "urgentBottomShadowColor",   0x9B1D1D )\
+	X(RES_INACTIVE_BG,  "Background",        "inactiveBackground",        0xAAAAAA )\
+	X(RES_INACTIVE_FG,  "Foreground",        "inactiveBackground",        0xAAAAAA )\
+	X(RES_INACTIVE_BOR, "BorderColor",       "inactiveBorderColor",       0x000000 )\
+	X(RES_INACTIVE_TOP, "TopShadowColor",    "inactiveTopShadowColor",    0xFFFFFF )\
+	X(RES_INACTIVE_BOT, "BottomShadowColor", "inactiveBottomShadowColor", 0x555555 )\
+	/* width resources MUST be listed next; value is width in pixels              */\
+	X(RES_BORDER,       "BorderWidth",       "borderWidth",               1        )\
+	X(RES_SHADOW,       "ShadowThickness",   "shadowThickness",           1        )\
+	X(RES_SEPARATOR,    "SeparatorWidth",    "separatorWidth",            1        )\
+	/* geometry resources; values are width and height in pixels                  */\
+	X(RES_GEOMETRY,     "Geometry",          "geometry",                  58       )\
 
 #define MOUSEEVENTMASK  (ButtonReleaseMask | PointerMotionMask)
 
@@ -83,25 +78,17 @@ enum Atom {
 #undef  X
 };
 
-enum Widget {
-#define X(widget, class, name) widget,
-	WIDGETS
-	NWIDGETS
-#undef  X
-};
-
 enum Resource {
-#define X(resource, widget, class, name, red, green, blue) resource,
+#define X(resource, class, name, value) resource,
 	RESOURCES
 	NRESOURCES
 #undef  X
 };
 
 enum Width {
-	DESK_BORDER_WIDTH,
-	DESK_SHADOW_WIDTH,
-	WIN_BORDER_WIDTH,
-	WIN_SHADOW_WIDTH,
+	BORDER_WIDTH,
+	SHADOW_WIDTH,
+	SEPARATOR_WIDTH,
 	NBORDERS,
 };
 
@@ -141,7 +128,6 @@ typedef struct {
 } Color;
 
 typedef struct {
-	enum Widget     widget;
 	XrmClass        class;
 	XrmName         name;
 } Resource;
@@ -195,7 +181,7 @@ typedef struct {
 
 	/* atoms and resources */
 	const char     *xrm;
-	Resource        widgets[NWIDGETS];
+	Resource        application;
 	Resource        resources[NRESOURCES];
 	Atom            atoms[NATOMS];
 
@@ -596,10 +582,7 @@ drawshadows(Pager *pager, Picture picture, int scheme, XRectangle *geometry, boo
 		top = COLOR_TOP;
 		bot = COLOR_BOT;
 	}
-	if (scheme == SCM_DESKTOP)
-		w = pager->borders[DESK_SHADOW_WIDTH];
-	else
-		w = pager->borders[WIN_SHADOW_WIDTH];
+	w = pager->borders[SHADOW_WIDTH];
 	for(i = 0; i < w; i++) {
 		/* draw light shadow */
 		XRenderFillRectangle(
@@ -775,7 +758,7 @@ setdeskgeom(Pager *pager)
 	XRectangle *geometry;
 	Cardinal i;
 
-	off = pager->borders[DESK_SHADOW_WIDTH];
+	off = pager->borders[SHADOW_WIDTH];
 	w = pager->geometry.width;
 	w -= off * 2 + 1;
 	if (w < 1)
@@ -791,14 +774,14 @@ setdeskgeom(Pager *pager)
 		else
 			xi /= pager->nrows;
 		if (pager->corner == _NET_WM_TOPRIGHT) {
-			x = pager->ncols - pager->borders[DESK_BORDER_WIDTH] - xi % pager->ncols;
+			x = pager->ncols - pager->borders[SEPARATOR_WIDTH] - xi % pager->ncols;
 			y = yi % pager->nrows;
 		} else if (pager->corner == _NET_WM_BOTTOMLEFT) {
 			x = xi % pager->ncols;
-			y = pager->nrows - pager->borders[DESK_BORDER_WIDTH] - yi % pager->nrows;
+			y = pager->nrows - pager->borders[SEPARATOR_WIDTH] - yi % pager->nrows;
 		} else if (pager->corner == _NET_WM_BOTTOMRIGHT) {
-			x = pager->ncols - pager->borders[DESK_BORDER_WIDTH] - xi % pager->ncols;
-			y = pager->nrows - pager->borders[DESK_BORDER_WIDTH] - yi % pager->nrows;
+			x = pager->ncols - pager->borders[SEPARATOR_WIDTH] - xi % pager->ncols;
+			y = pager->nrows - pager->borders[SEPARATOR_WIDTH] - yi % pager->nrows;
 		} else {
 			x = xi % pager->ncols;
 			y = yi % pager->nrows;
@@ -1081,7 +1064,7 @@ setclients(Pager *pager)
 			clients[i]->miniwins[j] = createminiwindow(
 				pager,
 				pager->desktops[j].miniwin,
-				pager->borders[WIN_BORDER_WIDTH]
+				pager->borders[BORDER_WIDTH]
 			);
 			configureclient(pager, j, clients[i]);
 		}
@@ -1175,8 +1158,8 @@ mousemove(Pager *pager, Client *cp, Window win, int dx, int dy, Time time)
 		pager->display,
 		win,
 		pager->window,
-		0 - pager->borders[WIN_BORDER_WIDTH],
-		0 - pager->borders[WIN_BORDER_WIDTH],
+		0 - pager->borders[BORDER_WIDTH],
+		0 - pager->borders[BORDER_WIDTH],
 		&newx, &newy,
 		&dw
 	);
@@ -1323,38 +1306,26 @@ newxdb(Pager *pager, const char *str)
 static const char *
 getresource(Pager *pager, XrmDatabase xdb, enum Resource res)
 {
-	XrmQuark *names, *classes;
 	XrmRepresentation tmp;
 	XrmValue xval;
+	Bool success;
 
-	if (pager->resources[res].widget == WID_APP) {
-		names = (XrmQuark[]){
-			pager->widgets[WID_APP].name,
+	success = XrmQGetResource(
+		xdb,
+		(XrmName[]){
+			pager->application.name,
 			pager->resources[res].name,
 			NULLQUARK,
-		};
-		classes = (XrmQuark[]){
-			pager->widgets[WID_APP].class,
+		},
+		(XrmClass[]){
+			pager->application.class,
 			pager->resources[res].class,
 			NULLQUARK,
-		};
-	} else {
-		names = (XrmQuark[]){
-			pager->widgets[WID_APP].name,
-			pager->widgets[pager->resources[res].widget].name,
-			pager->resources[res].name,
-			NULLQUARK,
-		};
-		classes = (XrmQuark[]){
-			pager->widgets[WID_APP].class,
-			pager->widgets[pager->resources[res].widget].class,
-			pager->resources[res].class,
-			NULLQUARK,
-		};
-	}
-	if (XrmQGetResource(xdb, names, classes, &tmp, &xval))
-		return xval.addr;
-	return NULL;
+		},
+		&tmp,
+		&xval
+	);
+	return success ? xval.addr : NULL;
 }
 
 static void
@@ -1603,6 +1574,10 @@ clean(Pager *pager)
 	XCloseDisplay(pager->display);
 }
 
+#define RED(v)   ((((v) & 0xFF0000) >> 8) | (((v) & 0xFF0000) >> 16))
+#define GREEN(v) ((((v) & 0x00FF00)     ) | (((v) & 0x00FF00) >> 8))
+#define BLUE(v)  ((((v) & 0x0000FF) << 8) | (((v) & 0x0000FF)     ))
+
 static void
 setup(Pager *pager, int argc, char *argv[], char *name, char *geomstr)
 {
@@ -1612,28 +1587,10 @@ setup(Pager *pager, int argc, char *argv[], char *name, char *geomstr)
 #undef  X
 	};
 	static struct {
-		char *class, *name;
-	} widgets[NWIDGETS] = {
-#define X(i, c, n) [i] = { .class = c, .name = n },
-		WIDGETS
-#undef  X
-	};
-	static struct {
 		const char *class, *name;
-		enum Widget widget;
-		unsigned int red, green, blue;
-		unsigned int width, height;
+		unsigned int value;
 	} resdefs[NRESOURCES] = {
-#define X(i, w, c, n, r, g, b) [i] = {  \
-		.class = c,             \
-		.widget = w,            \
-		.name = n,              \
-		.red = r,               \
-		.green = g,             \
-		.blue = b,              \
-		.width = r,             \
-		.height = g             \
-	},
+#define X(i, c, n, v) [i] = { .class = c, .name = n, .value = v, },
 		RESOURCES
 #undef  X
 	};
@@ -1645,6 +1602,9 @@ setup(Pager *pager, int argc, char *argv[], char *name, char *geomstr)
 	Color *color;
 	size_t i;
 	int success, status, screen;
+
+	if (name == NULL)
+		name = APP_NAME;
 
 	/* connect to server */
 	if ((pager->display = XOpenDisplay(NULL)) == NULL) {
@@ -1700,30 +1660,24 @@ setup(Pager *pager, int argc, char *argv[], char *name, char *geomstr)
 
 	/* intern quarks and set colors */
 	XrmInitialize();
-	if (name != NULL)
-		widgets[WID_APP].name = name;
-	for (i = 0; i < NWIDGETS; i++) {
-		resource = &pager->widgets[i];
-		resource->class = XrmPermStringToQuark(widgets[i].class);
-		resource->name = XrmPermStringToQuark(widgets[i].name);
-	}
+	pager->application.class = XrmPermStringToQuark(APP_CLASS);
+	pager->application.name = XrmPermStringToQuark(name);
 	for (i = 0; i < NRESOURCES; i++) {
 		resource = &pager->resources[i];
 		resource->class = XrmPermStringToQuark(resdefs[i].class);
 		resource->name = XrmPermStringToQuark(resdefs[i].name);
-		resource->widget = resdefs[i].widget;
 		if (i < NCOLORS) {
 			pager->colors[i].channels = (XRenderColor){
-				.red   = resdefs[i].red,
-				.green = resdefs[i].green,
-				.blue  = resdefs[i].blue,
+				.red   = RED(resdefs[i].value),
+				.green = GREEN(resdefs[i].value),
+				.blue  = BLUE(resdefs[i].value),
 				.alpha = 0xFFFF,
 			};
 		} else if (i < NCOLORS + NBORDERS) {
-			pager->borders[i-NCOLORS] = resdefs[i].width;
+			pager->borders[i-NCOLORS] = resdefs[i].value;
 		} else if (i == RES_GEOMETRY) {
-			pager->geometry.width = resdefs[i].width;
-			pager->geometry.height = resdefs[i].height;
+			pager->geometry.width = resdefs[i].value;
+			pager->geometry.height = resdefs[i].value;
 		}
 	}
 
@@ -1802,8 +1756,8 @@ setup(Pager *pager, int argc, char *argv[], char *name, char *geomstr)
 	XmbSetWMProperties(
 		pager->display,
 		pager->window,
-		widgets[WID_APP].class, /* title name */
-		widgets[WID_APP].class, /* icon name */
+		APP_CLASS,      /* title name */
+		APP_CLASS,      /* icon name */
 		argv,
 		argc,
 		&(XSizeHints){
@@ -1816,8 +1770,8 @@ setup(Pager *pager, int argc, char *argv[], char *name, char *geomstr)
 			.icon_window = pager->window,
 		},
 		&(XClassHint){
-			.res_class = widgets[WID_APP].class,
-			.res_name = widgets[WID_APP].name,
+			.res_class = APP_CLASS,
+			.res_name = name,
 		}
 	);
 

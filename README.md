@@ -19,25 +19,48 @@ Paginator understand the following command-line options.
 ## Customization
 Paginator can be customized by setting the following X resources.
 
-* `Paginator.client.activeBackground`
-* `Paginator.client.activeBorderColor`
-* `Paginator.client.activeTopShadowColor`
-* `Paginator.client.activeBottomShadowColor`
-* `Paginator.client.inactiveBackground`
-* `Paginator.client.inactiveBorderColor`
-* `Paginator.client.inactiveTopShadowColor`
-* `Paginator.client.inactiveBottomShadowColor`
-* `Paginator.client.urgentBackground`
-* `Paginator.client.urgentBorderColor`
-* `Paginator.client.urgentTopShadowColor`
-* `Paginator.client.urgentBottomShadowColor`
-* `Paginator.client.borderWidth`
-* `Paginator.client.shadowThickness`
-* `Paginator.pager.borderWidth`
-* `Paginator.pager.shadowThickness`
-* `Paginator.pager.background`
-* `Paginator.pager.foreground`
-* `Paginator.geometry`
+* `Paginator.background`:
+  Color of a desktop miniature.
+* `Paginator.foreground`:
+  Color of the selected desktop miniature.
+* `Paginator.separatorColor`:
+  Color of the separator between desktop miniature.
+* `Paginator.topShadowColor`:
+  Color of the light shadow around Paginator.
+* `Paginator.bottomShadowColor`:
+  Color of the heavy shadow around Paginator.
+* `Paginator.activeBackground`:
+  Color of the miniature of the active window.
+* `Paginator.activeBorderColor`:
+  Color of the border of the miniature of the active window.
+* `Paginator.activeTopShadowColor`:
+  Color of the light shadow of the miniature of the active window.
+* `Paginator.activeBottomShadowColor`:
+  Color of the heavy shadow of the miniature of the active window.
+* `Paginator.inactiveBackground`:
+  Color of the miniature of a regular window.
+* `Paginator.inactiveBorderColor`:
+  Color of the border of the miniature of a regular window.
+* `Paginator.inactiveTopShadowColor`:
+  Color of the light shadow of the miniature of a regular window.
+* `Paginator.inactiveBottomShadowColor`:
+  Color of the heavy shadow of the miniature of a regular window.
+* `Paginator.urgentBackground`:
+  Color of the miniature of an urgent window.
+* `Paginator.urgentBorderColor`:
+  Color of the border of the miniature of an urgent window.
+* `Paginator.urgentTopShadowColor`:
+  Color of the light shadow of the miniature of an urgent window.
+* `Paginator.urgentBottomShadowColor`:
+  Color of the heavy shadow of the miniature of an urgent window.
+* `Paginator.borderWidth`:
+  Width in pixels of the border around the miniatures of windows.
+* `Paginator.separatorWidth`:
+  Width in pixels of the separator between desktop miniatures.
+* `Paginator.shadowThickness`:
+  Width in pixels of the 3D shadows.
+* `Paginator.geometry`:
+  Initial geometry of paginator.
 
 ## Installation
 Run `make all` to build, and `make install` to install the binary and

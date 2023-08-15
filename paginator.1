@@ -76,53 +76,42 @@ properties.
 .Sh RESOURCES
 .Nm
 understands the following X resources.
-.Pp
-Resources have the format
-.Ar "APPLICATION.WIDGET.RESOURCE"
-(or
-.Ar "APPLICATION.RESOURCE"
-for the geometry).
-.Ar APPLICATION
-must be either the
+They must be prefixed with either the
 .Qq Ic Paginator
-class or the name specified by the
+class, or the name given with the
 .Fl name
-command-line option.
-.Ar WIDGET
-must be either
-.Qq Ic pager
-for the pager itself, or
-.Qq Ic client
-for the client window miniatures.
+command-line option, followed by a period.
 .Bl -tag -width Ds
-.It Ic client.activeBackground
+.It Ic activeBackground
 The color of the background of the active window.
-.It Ic client.activeBorderColor
+.It Ic activeBorderColor
 The color of the border of the active window.
-.It Ic client.activeTopShadowColor , client.activeBottomShadowColor
+.It Ic activeTopShadowColor , activeBottomShadowColor
 The light and dark colors of the Motif-like 3D shadow of the active window.
-.It Ic client.borderWidth , pager.borderWidth
-The width in pixels of the borders of the window miniatures and the pager itself.
-.It Ic client.inactiveBackground
-The color of the background of the inactive window.
-.It Ic client.inactiveBorderColor
-The color of the border of the inactive window.
-.It Ic client.inactiveTopShadowColoror , client.inactiveBottomShadowColor
-The light and dark colors of the Motif-like 3D shadow of the inactive window.
-.It Ic client.urgentBackground
-The color of the background of the urgent window.
-.It Ic client.urgentBorderColor
-The color of the border of the urgent window.
-.It Ic client.urgentTopShadowColoror , client.urgentBottomShadowColor
-The light and dark colors of the Motif-like 3D shadow of the urgent window.
-.It Ic client.shadowThickness , pager.shadowThickness
-The width in pixels of the Motif-like 3D shadow border.
-.It Ic pager.background
+.It Ic borderWidth
+The width in pixels of the borders of the window miniatures 
+.It Ic background
 The color of the desktop miniatures.
-.It Ic pager.foreground
+.It Ic foreground
 The color of the desktop miniature for the current desktop.
 .It Ic geometry
-The initial size and location of the pager.
+The initial size and location of Paginator.
+.It Ic inactiveBackground
+The color of the background of the inactive window.
+.It Ic inactiveBorderColor
+The color of the border of the inactive window.
+.It Ic inactiveTopShadowColoror , inactiveBottomShadowColor
+The light and dark colors of the Motif-like 3D shadow of the inactive window.
+.It Ic separatorWidth
+The width in pixels of the separators between desktop miniatures.
+.It Ic shadowThickness
+The width in pixels of the Motif-like 3D shadow borders.
+.It Ic urgentBackground
+The color of the background of the urgent window.
+.It Ic urgentBorderColor
+The color of the border of the urgent window.
+.It Ic urgentTopShadowColoror , urgentBottomShadowColor
+The light and dark colors of the Motif-like 3D shadow of the urgent window.
 .El
 .Sh ENVIRONMENT
 The following environment variables affect the execution of
