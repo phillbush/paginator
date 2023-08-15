@@ -4,10 +4,15 @@
 
 (Paginator is at the top right on the image.)
 
-Paginator is a desktop pager for EWMH-compliant X11 window managers.
-Paginator provides a graphical interface displaying the current
-configuration of all desktops, allowing the user to change the current
-desktop or the current active window with the mouse.
+Paginator is a desktop pager for EWMH-compliant X11 window managers that
+support docked applications (dockapps), such as WindowMaker and Fluxbox.
+
+Paginator shows a grid of desktop miniatures representing actual virtual
+desktops; each one having window miniatures representing actual windows.
+By manipulating those miniatures with the mouse, the user can change the
+active window, set the desktop of a window, and switch between desktops.
+
+Paginator is configured solely by X resources and command-line options.
 
 ## Options
 Paginator understand the following command-line options.
