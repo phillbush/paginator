@@ -22,9 +22,9 @@ Paginator can be customized by setting the following X resources.
 * `Paginator.background`:
   Color of a desktop miniature.
 * `Paginator.foreground`:
-  Color of the selected desktop miniature.
+  Color of the current desktop miniature.
 * `Paginator.separatorColor`:
-  Color of the separator between desktop miniature.
+  Color of the separator between desktop miniatures.
 * `Paginator.topShadowColor`:
   Color of the light shadow around Paginator.
 * `Paginator.bottomShadowColor`:
