@@ -24,8 +24,6 @@ Paginator understand the following command-line options.
 ## Customization
 Paginator can be customized by setting the following X resources.
 
-* `Paginator.separatorColor`:
-  Color of the separator between desktop miniatures.
 * `Paginator.activeBackground`:
   Color of the miniature of the active window.
 * `Paginator.activeBorderColor`:
@@ -34,6 +32,8 @@ Paginator can be customized by setting the following X resources.
   Color of the light shadow of the miniature of the active window.
 * `Paginator.activeBottomShadowColor`:
   Color of the heavy shadow of the miniature of the active window.
+* `Paginator.borderWidth`:
+  Width in pixels of the border around the miniatures of windows.
 * `Paginator.currentDesktopBackground`:
   Color of the current desktop miniature.
 * `Paginator.desktopBackground`:
@@ -44,6 +44,8 @@ Paginator can be customized by setting the following X resources.
   Color of the heavy shadow around Paginator.
 * `Paginator.frameShadowThickness`:
   Width in pixels of the 3D shadow frame around Paginator.
+* `Paginator.geometry`:
+  Initial geometry of paginator.
 * `Paginator.inactiveBackground`:
   Color of the miniature of a regular window.
 * `Paginator.inactiveBorderColor`:
@@ -60,14 +62,12 @@ Paginator can be customized by setting the following X resources.
   Color of the light shadow of the miniature of an urgent window.
 * `Paginator.urgentBottomShadowColor`:
   Color of the heavy shadow of the miniature of an urgent window.
-* `Paginator.borderWidth`:
-  Width in pixels of the border around the miniatures of windows.
+* `Paginator.separatorColor`:
+  Color of the separator between desktop miniatures.
 * `Paginator.separatorWidth`:
   Width in pixels of the separator between desktop miniatures.
 * `Paginator.shadowThickness`:
   Width in pixels of the 3D shadows.
-* `Paginator.geometry`:
-  Initial geometry of paginator.
 
 ## Installation
 Run `make all` to build, and `make install` to install the binary and
