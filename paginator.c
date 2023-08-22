@@ -811,13 +811,23 @@ unmapclient(Pager *pager, Client *cp)
 	}
 }
 
+static bool
+isatdesk(Client *cp, Cardinal desk)
+{
+	if (cp->ishidden)
+		return false;
+	if (cp->desk == ALLDESKTOPS)
+		return true;
+	return (cp->desk == desk);
+}
+
 static void
 mapclient(Pager *pager, Client *cp)
 {
 	Cardinal i;
 
 	for (i = 0; i < pager->ndesktops; i++) {
-		if (cp->desk == ALLDESKTOPS || cp->desk == i) {
+		if (isatdesk(cp, i)) {
 			XMapWindow(pager->display, cp->miniwins[i]);
 		} else {
 			XUnmapWindow(pager->display, cp->miniwins[i]);
